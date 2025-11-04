@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using System.Linq;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 using InvolveX.Cli.Services;
@@ -1710,64 +1711,174 @@ namespace InvolveX.Cli
             Application.Run(systemRestoreSubmenu);
         }
 
-        static void ShowSpecificProgramUpdateDialog(PackageManagerService packageManagerService, List<string> availableManagers)
+        static async Task ShowSpecificProgramUpdateDialog(PackageManagerService packageManagerService, List<string> availableManagers)
         {
-            var programNameInput = new TextField("")
-            {
-                X = Pos.Center(),
-                Y = 3,
-                Width = 30
-            };
-
-            var managerList = new ListView(availableManagers)
-            {
-                X = Pos.Center(),
-                Y = 6,
-                Width = 20,
-                Height = 4,
-                CanFocus = true,
-                ColorScheme = Colors.Dialog
-            };
-
-            var updateDialog = new Dialog("Update Specific Program", 60, 15)
+            // Create a more comprehensive update dialog
+            var updateDialog = new Dialog("Update Specific Programs", 80, 20)
             {
                 ColorScheme = Colors.Dialog
             };
 
-            updateDialog.Add(new Label("Enter program name to update:") { X = Pos.Center(), Y = 1 });
-            updateDialog.Add(programNameInput);
-            updateDialog.Add(new Label("Select package manager:") { X = Pos.Center(), Y = 5 });
-
-            var updateButton = new Button("Update")
+            // Instructions
+            var instructionsLabel = new Label("Select package managers and enter program names to update.\nUse comma-separated values for multiple programs per manager.")
             {
-                X = Pos.Center() - 10,
-                Y = 11,
+                X = 1,
+                Y = 1,
+                Width = Dim.Fill() - 2
+            };
+            updateDialog.Add(instructionsLabel);
+
+            // Package manager selection checkboxes
+            var managerCheckboxes = new List<(string name, CheckBox checkbox)>();
+            var yPos = 4;
+
+            foreach (var manager in availableManagers)
+            {
+                var checkbox = new CheckBox($"{manager}")
+                {
+                    X = 2,
+                    Y = yPos,
+                    Checked = false
+                };
+                updateDialog.Add(checkbox);
+                managerCheckboxes.Add((manager, checkbox));
+                yPos += 2;
+            }
+
+            // Program names input area
+            var programNamesLabel = new Label("Program names (comma-separated):")
+            {
+                X = 2,
+                Y = yPos + 1
+            };
+            updateDialog.Add(programNamesLabel);
+
+            var programNamesInput = new TextField("")
+            {
+                X = 2,
+                Y = yPos + 2,
+                Width = Dim.Fill() - 4
+            };
+            updateDialog.Add(programNamesInput);
+
+            // Buttons
+            var updateButton = new Button("Update Selected")
+            {
+                X = Pos.Center() - 15,
+                Y = yPos + 4,
                 IsDefault = true
             };
 
             var cancelButton = new Button("Cancel")
             {
-                X = Pos.Center() + 4,
-                Y = 11
+                X = Pos.Center() + 2,
+                Y = yPos + 4
             };
 
-            updateButton.Clicked += () =>
+            updateButton.Clicked += async () =>
             {
-                var programName = programNameInput.Text.ToString();
-                var selectedManagerIndex = managerList.SelectedItem;
-                var selectedManager = availableManagers[selectedManagerIndex];
+                var selectedManagers = managerCheckboxes.Where(m => m.checkbox.Checked).Select(m => m.name).ToList();
+                var programNamesText = programNamesInput.Text.ToString();
 
-                if (!string.IsNullOrEmpty(programName))
+                if (selectedManagers.Count == 0)
                 {
-                    var confirm = MessageBox.Query("Confirm Update",
-                        $"Update '{programName}' using {selectedManager}?", "Yes", "No");
-                    if (confirm == 0) // "Yes" selected
+                    MessageBox.ErrorQuery("Error", "Please select at least one package manager.", "Ok");
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(programNamesText))
+                {
+                    MessageBox.ErrorQuery("Error", "Please enter at least one program name.", "Ok");
+                    return;
+                }
+
+                var programNames = programNamesText.Split(',')
+                    .Select(p => p.Trim())
+                    .Where(p => !string.IsNullOrWhiteSpace(p))
+                    .ToList();
+
+                if (programNames.Count == 0)
+                {
+                    MessageBox.ErrorQuery("Error", "No valid program names found.", "Ok");
+                    return;
+                }
+
+                var confirmMessage = $"Update the following programs?\n\nManagers: {string.Join(", ", selectedManagers)}\nPrograms: {string.Join(", ", programNames)}";
+                var confirm = MessageBox.Query("Confirm Updates", confirmMessage, "Yes", "No");
+
+                if (confirm == 0) // "Yes" selected
+                {
+                    await RunBulkProgramUpdates(packageManagerService, selectedManagers, programNames);
+                    Application.RequestStop(); // Close input dialog
+                }
+            };
+
+            cancelButton.Clicked += () => Application.RequestStop();
+
+            updateDialog.AddButton(updateButton);
+            updateDialog.AddButton(cancelButton);
+
+            Application.Run(updateDialog);
+        }
+
+        static async Task RunBulkProgramUpdates(PackageManagerService packageManagerService, List<string> managers, List<string> programNames)
+        {
+            var progressDialog = new Dialog("Updating Programs...", 70, 12)
+            {
+                ColorScheme = Colors.Dialog
+            };
+
+            var progressLabel = new Label("Starting updates...")
+            {
+                X = Pos.Center(),
+                Y = 1
+            };
+            progressDialog.Add(progressLabel);
+
+            var statusLabel = new Label("")
+            {
+                X = Pos.Center(),
+                Y = 3
+            };
+            progressDialog.Add(statusLabel);
+
+            var resultsLabel = new Label("")
+            {
+                X = 1,
+                Y = 5,
+                Width = Dim.Fill() - 2,
+                Height = 4
+            };
+            progressDialog.Add(resultsLabel);
+
+            var progressDialogClosed = new TaskCompletionSource<bool>();
+            _ = Task.Run(() =>
+            {
+                Application.Run(progressDialog);
+                progressDialogClosed.SetResult(true);
+            });
+
+            var results = new List<string>();
+            var errors = new List<string>();
+            var totalOperations = managers.Count * programNames.Count;
+            var completedOperations = 0;
+
+            try
+            {
+                foreach (var manager in managers)
+                {
+                    foreach (var programName in programNames)
                     {
-                        // Run the update operation
+                        Application.MainLoop.Invoke(() =>
+                        {
+                            progressLabel.Text = $"Updating {programName} with {manager}...";
+                            statusLabel.Text = $"{completedOperations + 1}/{totalOperations} completed";
+                        });
+
                         try
                         {
                             Task updateTask;
-                            switch (selectedManager)
+                            switch (manager)
                             {
                                 case "winget":
                                     updateTask = packageManagerService.UpdateSpecificProgramWithWinget(programName);
@@ -1782,48 +1893,59 @@ namespace InvolveX.Cli
                                     updateTask = packageManagerService.UpdateSpecificProgramWithChoco(programName);
                                     break;
                                 default:
-                                    MessageBox.ErrorQuery("Error", "Unsupported package manager selected.", "Ok");
-                                    return;
+                                    errors.Add($"{manager}: Unsupported package manager");
+                                    continue;
                             }
 
-                            var progressDialog = new Dialog($"Updating {programName}...", 50, 8)
-                            {
-                                ColorScheme = Colors.Dialog
-                            };
-
-                            var progressLabel = new Label($"Updating {programName} with {selectedManager}, please wait...")
-                            {
-                                X = Pos.Center(),
-                                Y = 1
-                            };
-                            progressDialog.Add(progressLabel);
-
-                            Application.Run(progressDialog);
-
-                            updateTask.Wait(); // Wait for completion
-
-                            MessageBox.Query("Success", $"{programName} update completed successfully!", "Ok");
+                            await updateTask;
+                            results.Add($"{manager}: {programName} - Success");
                         }
                         catch (Exception ex)
                         {
-                            MessageBox.ErrorQuery("Error", $"Failed to update {programName}: {ex.Message}", "Ok");
+                            errors.Add($"{manager}: {programName} - Failed ({ex.Message})");
                         }
-                        Application.RequestStop(); // Close input dialog
+
+                        completedOperations++;
+
+                        Application.MainLoop.Invoke(() =>
+                        {
+                            var resultText = "";
+                            if (results.Count > 0)
+                            {
+                                resultText += $"✓ Success: {results.Count}\n";
+                            }
+                            if (errors.Count > 0)
+                            {
+                                resultText += $"✗ Failed: {errors.Count}";
+                            }
+                            resultsLabel.Text = resultText;
+                        });
                     }
                 }
-                else
+
+                Application.MainLoop.Invoke(() =>
                 {
-                    MessageBox.ErrorQuery("Error", "Program name cannot be empty", "Ok");
-                }
-            };
+                    var finalMessage = $"Update Complete!\n\nSuccessful: {results.Count}\nFailed: {errors.Count}";
 
-            cancelButton.Clicked += () => Application.RequestStop();
+                    if (errors.Count > 0)
+                    {
+                        finalMessage += $"\n\nFailed updates:\n{string.Join("\n", errors)}";
+                    }
 
-            updateDialog.AddButton(updateButton);
-            updateDialog.AddButton(cancelButton);
-            updateDialog.Add(managerList);
+                    MessageBox.Query("Update Results", finalMessage, "Ok");
+                    Application.RequestStop(); // Close progress dialog
+                });
+            }
+            catch (Exception ex)
+            {
+                Application.MainLoop.Invoke(() =>
+                {
+                    MessageBox.ErrorQuery("Error", $"Update process failed: {ex.Message}", "Ok");
+                    Application.RequestStop(); // Close progress dialog
+                });
+            }
 
-            Application.Run(updateDialog);
+            await progressDialogClosed.Task;
         }
 
         // Method to show funding information
