@@ -43,7 +43,7 @@ A comprehensive Windows system administration CLI toolkit built with .NET and Te
 ### Option 1: Download from GitHub Releases
 ```powershell
 # Download and run the latest release
-irm https://raw.githubusercontent.com/involvex/Involvex-Cli/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/involvex/Involvex-Cli/refs/heads/master/install.ps1 | iex
 ```
 
 ### Option 2: Build from Source
