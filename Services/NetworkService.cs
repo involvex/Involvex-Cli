@@ -190,13 +190,22 @@ namespace InvolveX.Cli.Services
                 };
 
                 speedTestProcess.Start();
-                string output = await speedTestProcess.StandardOutput.ReadToEndAsync();
-                string error = await speedTestProcess.StandardError.ReadToEndAsync();
-                await speedTestProcess.WaitForExitAsync();
+
+                // Read both stdout and stderr
+                var outputTask = speedTestProcess.StandardOutput.ReadToEndAsync();
+                var errorTask = speedTestProcess.StandardError.ReadToEndAsync();
+                var exitTask = speedTestProcess.WaitForExitAsync();
+
+                // Wait for all to complete
+                await Task.WhenAll(outputTask, errorTask, exitTask);
+
+                string output = outputTask.Result;
+                string error = errorTask.Result;
 
                 if (speedTestProcess.ExitCode == 0)
                 {
                     _logService.Log("Speed test completed successfully.");
+                    // Return only the final result (stdout), ignore progress messages from stderr
                     return output.Trim();
                 }
                 else

@@ -1143,7 +1143,7 @@ namespace InvolveX.Cli
                             ColorScheme = Colors.Dialog
                         };
 
-                        var progressLabel = new Label("Initializing speed test, please wait...")
+                        var progressLabel = new Label("Running complete speed test, please wait...")
                         {
                             X = Pos.Center(),
                             Y = 1
@@ -1168,16 +1168,11 @@ namespace InvolveX.Cli
 
                         speedTestDialog.AddButton(cancelSpeedTestButton);
 
-                        // Run speed test asynchronously
+                        // Run speed test asynchronously - wait for complete result
                         var speedTestTask = Task.Run(async () =>
                         {
                             try
                             {
-                                Application.MainLoop.Invoke(() =>
-                                {
-                                    progressLabel.Text = "Finding best server...";
-                                });
-
                                 var result = await networkService.RunSpeedTest();
                                 speedTestResult = result;
                                 speedTestCompleted = true;
@@ -1200,12 +1195,12 @@ namespace InvolveX.Cli
                         else
                         {
                             // Wait for the task with a reasonable timeout
-                            var completed = speedTestTask.Wait(65000); // 65 second timeout
+                            var completed = speedTestTask.Wait(120000); // 120 second timeout for complete test
 
                             if (!completed)
                             {
                                 speedTestCts?.Cancel();
-                                MessageBox.ErrorQuery("Timeout", "Speed test timed out after 60 seconds.", "Ok");
+                                MessageBox.ErrorQuery("Timeout", "Speed test timed out after 120 seconds.", "Ok");
                             }
                             else if (speedTestException != null)
                             {
@@ -1213,7 +1208,8 @@ namespace InvolveX.Cli
                             }
                             else if (speedTestCompleted && speedTestResult != null)
                             {
-                                MessageBox.Query("Speed Test Result", speedTestResult, "Ok");
+                                // Display the complete speed test result
+                                MessageBox.Query("Speed Test Complete", speedTestResult, "Ok");
                             }
                             else
                             {
