@@ -3,6 +3,7 @@
 
 param(
     [switch]$Install,
+    [switch]$Run,
     [switch]$Uninstall,
     [string]$InstallPath = "$env:USERPROFILE\InvolveX-CLI",
     [switch]$AddToPath,
@@ -160,6 +161,22 @@ function Install-InvolveX {
         Write-ColorOutput "`nFor help and documentation, visit:" "Cyan"
         Write-ColorOutput "  https://github.com/$RepoOwner/$RepoName" "White"
 
+        # Run the application immediately if requested
+        if ($Run) {
+            $exePath = Join-Path $InstallPath $ExecutableName
+            if (Test-Path $exePath) {
+                Write-ColorOutput "`nLaunching InvolveX CLI..." "Green"
+                try {
+                    & $exePath
+                }
+                catch {
+                    Write-ColorOutput "Failed to launch application: $($_.Exception.Message)" "Red"
+                }
+            } else {
+                Write-ColorOutput "Warning: Could not find executable at $exePath" "Yellow"
+            }
+        }
+
     }
     catch {
         Write-ColorOutput "Installation failed: $($_.Exception.Message)" "Red"
@@ -205,11 +222,12 @@ function Show-Help {
     Write-ColorOutput "====================" "Green"
     Write-ColorOutput ""
     Write-ColorOutput "Usage:" "Cyan"
-    Write-ColorOutput "  .\install.ps1 -Install [-InstallPath <path>] [-AddToPath] [-CreateShortcut]" "White"
+    Write-ColorOutput "  .\install.ps1 -Install [-InstallPath <path>] [-AddToPath] [-CreateShortcut] [-Run]" "White"
     Write-ColorOutput "  .\install.ps1 -Uninstall [-InstallPath <path>]" "White"
     Write-ColorOutput ""
     Write-ColorOutput "Parameters:" "Cyan"
     Write-ColorOutput "  -Install          Install the latest version of InvolveX CLI" "White"
+    Write-ColorOutput "  -Run              Run the application immediately after installation" "White"
     Write-ColorOutput "  -Uninstall        Uninstall InvolveX CLI" "White"
     Write-ColorOutput "  -InstallPath      Installation directory (default: %USERPROFILE%\InvolveX-CLI)" "White"
     Write-ColorOutput "  -AddToPath        Add installation directory to user PATH" "White"
@@ -217,7 +235,8 @@ function Show-Help {
     Write-ColorOutput ""
     Write-ColorOutput "Examples:" "Cyan"
     Write-ColorOutput "  .\install.ps1 -Install" "White"
-    Write-ColorOutput "  .\install.ps1 -Install -AddToPath -CreateShortcut" "White"
+    Write-ColorOutput "  .\install.ps1 -Install -Run" "White"
+    Write-ColorOutput "  .\install.ps1 -Install -AddToPath -CreateShortcut -Run" "White"
     Write-ColorOutput "  .\install.ps1 -Install -InstallPath 'C:\Tools\InvolveX'" "White"
     Write-ColorOutput "  .\install.ps1 -Uninstall" "White"
 }

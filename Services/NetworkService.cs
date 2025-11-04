@@ -102,12 +102,31 @@ namespace InvolveX.Cli.Services
 
             try
             {
-                // Get the path to the Python script
-                var scriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Services", "Speedtest.py");
-
-                if (!File.Exists(scriptPath))
+                // Get the path to the Python script - try multiple possible locations
+                string scriptPath = null;
+                var possiblePaths = new[]
                 {
-                    return "Error: Speedtest service not found. Please ensure Speedtest.py exists in the Services directory.";
+                    // Current directory structure (development)
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Services", "Speedtest.py"),
+                    // Published app structure
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Speedtest.py"),
+                    // Try relative to executable location
+                    Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location), "Services", "Speedtest.py"),
+                    Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location), "Speedtest.py")
+                };
+
+                foreach (var path in possiblePaths)
+                {
+                    if (File.Exists(path))
+                    {
+                        scriptPath = path;
+                        break;
+                    }
+                }
+
+                if (scriptPath == null)
+                {
+                    return "Error: Speedtest service not found. Please ensure Speedtest.py is included in the application directory.";
                 }
 
                 // Check if Python is available
