@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InvolveX CLI - Windows System Administration Toolkit</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --text-color: #e0e0e0;
+            --accent-color: #00ff00;
+            --card-bg: #1a1a1a;
+            --border-color: #333;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 0;
+            border-bottom: 2px solid var(--accent-color);
+        }
+
+        .logo {
+            font-size: 3em;
+            color: var(--accent-color);
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px var(--accent-color);
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            color: #ccc;
+            margin-bottom: 30px;
+        }
+
+        .section {
+            margin: 40px 0;
+            padding: 30px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
+        .section h2 {
+            color: var(--accent-color);
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--accent-color);
+            padding-bottom: 10px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .feature-card {
+            background: #2a2a2a;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            transition: transform 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent-color);
+        }
+
+        .feature-card h3 {
+            color: var(--accent-color);
+            margin-bottom: 10px;
+        }
+
+        .code-block {
+            background: #0f0f0f;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            color: #00ff00;
+        }
+
+        .btn {
+            display: inline-block;
+            background: var(--accent-color);
+            color: var(--bg-color);
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 10px 10px 0;
+            transition: background 0.3s ease;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            background: #00cc00;
+            color: #000;
+        }
+
+        .funding-section {
+            text-align: center;
+            margin: 40px 0;
+        }
+
+        .funding-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .funding-link {
+            background: var(--card-bg);
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            text-decoration: none;
+            color: var(--text-color);
+            transition: all 0.3s ease;
+        }
+
+        .funding-link:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+            margin-top: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .logo {
+                font-size: 2em;
+            }
+
+            .container {
+                padding: 10px;
+            }
+
+            .section {
+                padding: 20px;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .funding-links {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">InvolveX CLI</div>
+            <div class="subtitle">Windows System Administration Toolkit</div>
+            <p>A powerful command-line interface for managing Windows systems, written in C# with Terminal.Gui</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <section class="section">
+            <h2>🚀 Quick Start</h2>
+            <p>Get started with InvolveX CLI in just a few steps:</p>
+
+            <h3>Installation</h3>
+            <div class="code-block">
+<code># Download the latest release from GitHub
+# Extract the ZIP file to your desired location
+# Run InvolveX.Cli.exe</code>
+            </div>
+
+            <h3>System Requirements</h3>
+            <ul>
+                <li>Windows 10/11</li>
+                <li>.NET 8.0 Runtime</li>
+                <li>Administrator privileges for some features</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2>✨ Features</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>📦 Package Management</h3>
+                    <p>Update Windows package managers including Winget, npm, Scoop, and Chocolatey. Keep all your development tools up to date with a single command.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🗂️ System Cache</h3>
+                    <p>Clear system caches and temporary files to free up disk space and improve system performance.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🚀 Startup Management</h3>
+                    <p>View and manage startup programs. Disable unwanted applications from launching at system boot.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🗑️ Program Uninstaller</h3>
+                    <p>Easily uninstall programs through a clean interface. Browse installed applications and remove them safely.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🌐 DNS Configuration</h3>
+                    <p>Set custom DNS servers or reset to default. Improve network performance and bypass restrictions.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📡 Network Diagnostics</h3>
+                    <p>Run ping tests and speed tests to diagnose network issues and monitor connection quality.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔧 Driver Management</h3>
+                    <p>Check for driver updates and manage device drivers through a simple interface.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔌 Plugin System</h3>
+                    <p>Extend functionality with plugins. Create custom tools and integrate them seamlessly.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>📖 Usage Examples</h2>
+
+            <h3>Update All Package Managers</h3>
+            <div class="code-block">
+<code>1. Launch InvolveX.Cli.exe
+2. Navigate to "Update" menu
+3. Select "Update All" option
+4. Watch progress as all package managers are updated</code>
+            </div>
+
+            <h3>Clear System Cache</h3>
+            <div class="code-block">
+<code>1. Select "Cache" from main menu
+2. Choose "Clear Cache" option
+3. Confirm the operation
+4. System caches are cleared automatically</code>
+            </div>
+
+            <h3>Network Diagnostics</h3>
+            <div class="code-block">
+<code>1. Choose "Network" from main menu
+2. Select "Run Ping Test"
+3. Enter hostname (e.g., google.com)
+4. View ping results and latency information</code>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>🔧 Advanced Configuration</h2>
+            <p>InvolveX CLI supports configuration files for customizing behavior:</p>
+            <ul>
+                <li>Custom update sources</li>
+                <li>Exclusion lists for updates</li>
+                <li>Plugin configurations</li>
+                <li>Network settings</li>
+            </ul>
+        </section>
+
+        <div class="funding-section">
+            <h2>💝 Support the Project</h2>
+            <p>If you find InvolveX CLI helpful, consider supporting the development:</p>
+            <div class="funding-links">
+                <a href="https://github.com/sponsors/involvex" class="funding-link" target="_blank" rel="noopener">
+                    🐙 GitHub Sponsors
+                </a>
+                <a href="https://www.buymeacoffee.com/involvex" class="funding-link" target="_blank" rel="noopener">
+                    ☕ Buy Me a Coffee
+                </a>
+                <a href="https://paypal.me/involvex" class="funding-link" target="_blank" rel="noopener">
+                    💰 PayPal
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 InvolveX CLI. Built with C# and Terminal.Gui.</p>
+            <p><a href="https://github.com/involvex/Involvex-Cli" class="btn" target="_blank" rel="noopener">View on GitHub</a></p>
+        </div>
+    </footer>
+
+    <script>
+        // Add some interactive effects
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add glow effect to logo
+            const logo = document.querySelector('.logo');
+            setInterval(() => {
+                logo.style.textShadow = Math.random() > 0.5
+                    ? '0 0 10px var(--accent-color)'
+                    : '0 0 20px var(--accent-color)';
+            }, 2000);
+
+            // Add click effects to buttons
+            const buttons = document.querySelectorAll('.btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    this.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        this.style.transform = 'scale(1)';
+                    }, 100);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
