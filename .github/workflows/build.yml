@@ -1,0 +1,84 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Test
+      run: dotnet test --no-restore --verbosity normal
+      continue-on-error: true
+
+    - name: Publish
+      run: dotnet publish --configuration Release --runtime win-x64 --self-contained true --output ./publish
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: InvolveX-CLI-${{ github.run_number }}
+        path: ./publish/
+
+    - name: Create Release Archive
+      if: github.event_name == 'release'
+      run: |
+        Compress-Archive -Path ./publish/* -DestinationPath InvolveX-CLI-${{ github.event.release.tag_name }}.zip
+
+    - name: Upload Release Asset
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./InvolveX-CLI-${{ github.event.release.tag_name }}.zip
+        asset_name: InvolveX-CLI-${{ github.event.release.tag_name }}.zip
+        asset_content_type: application/zip
+
+  docs:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Generate Documentation
+      run: |
+        dotnet tool install -g docfx
+        docfx init -q
+        docfx build
+
+    - name: Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs/_site
+        cname: docs.involvex-cli.dev
