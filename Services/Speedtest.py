@@ -12,15 +12,15 @@ from urllib.error import URLError, HTTPError
 
 class SpeedtestService:
     def __init__(self):
-        # Use reliable public speedtest servers
+        # Use well-known speed test servers with reliable file hosting
         self.test_servers = [
-            {"host": "speedtest.ftp.otenet.gr", "name": "OTEnet", "country": "Greece"},
-            {"host": "speedtest.tele2.net", "name": "Tele2", "country": "Netherlands"},
-            {"host": "speedtest.hinet.net", "name": "Hinet", "country": "Taiwan"},
-            {"host": "speedtest1.vodafone.pt", "name": "Vodafone", "country": "Portugal"},
-            {"host": "speedtest.sbcglobal.net", "name": "AT&T", "country": "USA"}
+            {"host": "speedtest.ookla.com", "name": "Ookla", "country": "Global", "files": ["/speedtest/random1000x1000.jpg", "/speedtest/random2000x2000.jpg"]},
+            {"host": "speedtest.tele2.net", "name": "Tele2", "country": "Netherlands", "files": ["/speedtest/random1000x1000.jpg", "/speedtest/random2000x2000.jpg"]},
+            {"host": "speedtest.centurylink.net", "name": "CenturyLink", "country": "USA", "files": ["/speedtest/random1000x1000.jpg", "/speedtest/random2000x2000.jpg"]},
+            {"host": "speedtest.xfinity.com", "name": "Xfinity", "country": "USA", "files": ["/speedtest/random1000x1000.jpg", "/speedtest/random2000x2000.jpg"]},
+            {"host": "speedtest.att.com", "name": "AT&T", "country": "USA", "files": ["/speedtest/random1000x1000.jpg", "/speedtest/random2000x2000.jpg"]}
         ]
-        self.timeout = 10
+        self.timeout = 15
 
     def get_best_server(self):
         """Find the best speedtest server based on latency"""
@@ -62,22 +62,29 @@ class SpeedtestService:
             print(f"Error finding best server: {e}", file=sys.stderr)
             return None
 
-    def test_download_speed(self, server_host, test_duration=20):
+    def test_download_speed(self, server_info, test_duration=20):
         """Test download speed by downloading test files for full duration"""
         try:
             print("Testing download speed...", file=sys.stderr)
 
-            # Use multiple test files to ensure continuous downloading
-            test_files = [
-                f"http://{server_host}/speedtest/random750x750.jpg",
-                f"http://{server_host}/speedtest/random1000x1000.jpg",
-                f"http://{server_host}/speedtest/random1500x1500.jpg",
-                f"http://{server_host}/speedtest/random2000x2000.jpg"
-            ]
+            server_host = server_info['host']
+            test_files = server_info.get('files', [])
+
+            # If no specific files defined, use default speedtest.net style
+            if not test_files:
+                test_files = [
+                    f"http://{server_host}/speedtest/random2000x2000.jpg",
+                    f"http://{server_host}/speedtest/random1500x1500.jpg",
+                    f"http://{server_host}/speedtest/random1000x1000.jpg"
+                ]
+            else:
+                # Convert relative paths to full URLs
+                test_files = [f"http://{server_host}{file_path}" for file_path in test_files]
 
             total_bytes = 0
             start_time = time.time()
             file_index = 0
+            successful_downloads = 0
 
             # Continue downloading for the full test duration
             while time.time() - start_time < test_duration and total_bytes < 50 * 1024 * 1024:  # Max 50MB
@@ -86,21 +93,25 @@ class SpeedtestService:
                     test_url = test_files[file_index % len(test_files)]
                     file_index += 1
 
-                    print(f"Downloading from {test_url}", file=sys.stderr)
+                    print(f"Testing download from {test_url}", file=sys.stderr)
                     req = Request(test_url, headers={'User-Agent': 'Mozilla/5.0'})
                     with urlopen(req, timeout=self.timeout) as response:
+                        file_start = time.time()
+                        file_bytes = 0
+
                         while time.time() - start_time < test_duration:
-                            chunk = response.read(16384)  # Larger chunks for better throughput
+                            chunk = response.read(32768)  # Even larger chunks for better throughput
                             if not chunk:
                                 break
                             total_bytes += len(chunk)
+                            file_bytes += len(chunk)
 
-                            # Break this file if we've downloaded enough from it (to avoid huge files)
-                            if len(chunk) < 16384:  # End of file
+                            # If we've downloaded a reasonable amount from this file, move to next
+                            if file_bytes > 1024 * 1024:  # 1MB per file max
                                 break
 
-                        # Close connection and try next file
-                        continue
+                        successful_downloads += 1
+                        print(f"Downloaded {file_bytes:,} bytes from file", file=sys.stderr)
 
                 except (URLError, HTTPError, OSError) as e:
                     print(f"Failed to download from {test_url}: {e}", file=sys.stderr)
@@ -109,12 +120,15 @@ class SpeedtestService:
 
             elapsed_time = time.time() - start_time
 
-            if elapsed_time >= test_duration * 0.8 and total_bytes > 100000:  # At least 80% of test time and 100KB
+            if elapsed_time >= test_duration * 0.5 and total_bytes > 50000 and successful_downloads > 0:  # At least 50% of test time, 50KB, and some successful downloads
                 # Convert bytes to bits per second, then to megabits per second
                 download_speed_mbps = (total_bytes * 8) / (elapsed_time * 1000000)
-                print(f"Downloaded {total_bytes:,} bytes in {elapsed_time:.1f}s", file=sys.stderr)
+                print(f"Downloaded {total_bytes:,} bytes in {elapsed_time:.1f}s from {successful_downloads} files", file=sys.stderr)
                 print(f"Download speed: {download_speed_mbps:.2f} Mbps", file=sys.stderr)
                 return max(download_speed_mbps, 0.1)  # Minimum 0.1 Mbps to avoid 0.00
+
+            else:
+                print(f"Insufficient data for speed test: {total_bytes} bytes in {elapsed_time:.1f}s", file=sys.stderr)
 
         except Exception as e:
             print(f"Error testing download speed: {e}", file=sys.stderr)
@@ -176,7 +190,7 @@ class SpeedtestService:
 
             print(f"Testing with server: {server_name}, {server_country}", file=sys.stderr)
 
-            download_speed = self.test_download_speed(server_host)
+            download_speed = self.test_download_speed(server)
             upload_speed = self.test_upload_speed(server_host)
 
             # Format results
