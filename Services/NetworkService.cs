@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -97,16 +98,24 @@ namespace InvolveX.Cli.Services
 
         public async Task<string> RunSpeedTest()
         {
-            _logService.Log("Running internet speed test using speedtest CLI.");
+            _logService.Log("Running internet speed test using Python speedtest service.");
 
             try
             {
-                // Check if speedtest CLI is installed
-                var checkProcess = new Process
+                // Get the path to the Python script
+                var scriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Services", "Speedtest.py");
+
+                if (!File.Exists(scriptPath))
+                {
+                    return "Error: Speedtest service not found. Please ensure Speedtest.py exists in the Services directory.";
+                }
+
+                // Check if Python is available
+                var pythonCheckProcess = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
-                        FileName = "speedtest",
+                        FileName = "python",
                         Arguments = "--version",
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
@@ -115,20 +124,19 @@ namespace InvolveX.Cli.Services
                     }
                 };
 
-                checkProcess.Start();
-                await checkProcess.WaitForExitAsync();
+                pythonCheckProcess.Start();
+                await pythonCheckProcess.WaitForExitAsync();
 
-                if (checkProcess.ExitCode != 0)
+                string pythonCommand = "python";
+                if (pythonCheckProcess.ExitCode != 0)
                 {
-                    // Try to install speedtest CLI if not available
-                    _logService.Log("Speedtest CLI not found, attempting to install...");
-
-                    var installProcess = new Process
+                    // Try python3
+                    var python3CheckProcess = new Process
                     {
                         StartInfo = new ProcessStartInfo
                         {
-                            FileName = "powershell",
-                            Arguments = "winget install --id Ookla.Speedtest.CLI --accept-source-agreements --accept-package-agreements",
+                            FileName = "python3",
+                            Arguments = "--version",
                             RedirectStandardOutput = true,
                             RedirectStandardError = true,
                             UseShellExecute = false,
@@ -136,30 +144,29 @@ namespace InvolveX.Cli.Services
                         }
                     };
 
-                    installProcess.Start();
-                    string installOutput = await installProcess.StandardOutput.ReadToEndAsync();
-                    string installError = await installProcess.StandardError.ReadToEndAsync();
-                    await installProcess.WaitForExitAsync();
+                    python3CheckProcess.Start();
+                    await python3CheckProcess.WaitForExitAsync();
 
-                    if (installProcess.ExitCode != 0)
+                    if (python3CheckProcess.ExitCode != 0)
                     {
-                        return $"Failed to install speedtest CLI. Error: {installError}";
+                        return "Error: Python is not installed or not available in PATH. Please install Python 3.x to use speedtest.";
                     }
 
-                    _logService.Log("Speedtest CLI installed successfully.");
+                    pythonCommand = "python3";
                 }
 
-                // Run the speed test
+                // Run the Python speedtest script
                 var speedTestProcess = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
-                        FileName = "speedtest",
-                        Arguments = "--accept-license --accept-gdpr",
+                        FileName = pythonCommand,
+                        Arguments = $"\"{scriptPath}\"",
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
-                        CreateNoWindow = true
+                        CreateNoWindow = true,
+                        WorkingDirectory = Path.GetDirectoryName(scriptPath) ?? AppDomain.CurrentDomain.BaseDirectory
                     }
                 };
 
@@ -171,12 +178,12 @@ namespace InvolveX.Cli.Services
                 if (speedTestProcess.ExitCode == 0)
                 {
                     _logService.Log("Speed test completed successfully.");
-                    return output;
+                    return output.Trim();
                 }
                 else
                 {
                     _logService.Log($"Speed test failed with exit code {speedTestProcess.ExitCode}: {error}");
-                    return $"Speed test failed: {error}";
+                    return $"Speed test failed: {error}\nOutput: {output}".Trim();
                 }
             }
             catch (Exception ex)
