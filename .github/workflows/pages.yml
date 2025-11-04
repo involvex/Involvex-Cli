@@ -30,6 +30,8 @@ jobs:
           # Copy website files if they exist
           cp index.html website/ 2>/dev/null || echo "index.html not found, creating default"
           cp -r assets website/ 2>/dev/null || echo "No assets directory found"
+          # Copy logo if it exists
+          cp logo.png website/ 2>/dev/null || echo "logo.png not found"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -45,7 +47,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./website
+        uses: actions/deploy-pages@v4
