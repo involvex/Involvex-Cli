@@ -559,9 +559,75 @@ namespace InvolveX.Cli
                 switch (selected)
                 {
                     case "List Startup Programs":
-                        var programsTask = startupService.ListStartupPrograms();
-                        programsTask.Wait(); // Wait for completion
-                        MessageBox.Query("Startup Programs", string.Join(Environment.NewLine, programsTask.Result), "Ok");
+                        // Show progress dialog for listing startup programs
+                        var startupProgressDialog = new Dialog("Loading Startup Programs...", 50, 8)
+                        {
+                            ColorScheme = Colors.Dialog
+                        };
+
+                        var startupProgressLabel = new Label("Scanning startup programs, please wait...")
+                        {
+                            X = Pos.Center(),
+                            Y = 1
+                        };
+                        startupProgressDialog.Add(startupProgressLabel);
+
+                        var cancelStartupButton = new Button("Cancel")
+                        {
+                            X = Pos.Center(),
+                            Y = 3
+                        };
+
+                        CancellationTokenSource? startupCts = new CancellationTokenSource();
+                        bool startupCompleted = false;
+
+                        cancelStartupButton.Clicked += () =>
+                        {
+                            startupCts?.Cancel();
+                            Application.RequestStop();
+                        };
+
+                        startupProgressDialog.AddButton(cancelStartupButton);
+
+                        // Run startup program listing asynchronously with timeout
+                        var startupTask = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                var programs = await startupService.ListStartupPrograms();
+                                startupCompleted = true;
+
+                                Application.MainLoop.Invoke(() =>
+                                {
+                                    MessageBox.Query("Startup Programs", string.Join(Environment.NewLine, programs), "Ok");
+                                    Application.RequestStop(); // Close progress dialog
+                                });
+                            }
+                            catch (Exception ex)
+                            {
+                                Application.MainLoop.Invoke(() =>
+                                {
+                                    MessageBox.ErrorQuery("Error", $"Failed to list startup programs: {ex.Message}", "Ok");
+                                    Application.RequestStop(); // Close progress dialog
+                                });
+                            }
+                        }, startupCts.Token);
+
+                        // Add timeout
+                        var startupTimeoutTask = Task.Delay(30000, startupCts.Token); // 30 second timeout
+                        var startupCompletedTask = Task.WhenAny(startupTask, startupTimeoutTask).Result;
+
+                        if (startupCompletedTask == startupTimeoutTask && !startupCompleted)
+                        {
+                            startupCts?.Cancel();
+                            MessageBox.ErrorQuery("Timeout", "Listing startup programs timed out after 30 seconds.", "Ok");
+                        }
+                        else
+                        {
+                            Application.Run(startupProgressDialog);
+                        }
+
+                        startupCts?.Dispose();
                         break;
                     case "Disable Startup Program":
                         var programNameInput = new TextField("")
@@ -664,9 +730,75 @@ namespace InvolveX.Cli
                 switch (selected)
                 {
                     case "List Installed Programs":
-                        var programsTask = uninstallerService.ListInstalledPrograms();
-                        programsTask.Wait(); // Wait for completion
-                        MessageBox.Query("Installed Programs", string.Join(Environment.NewLine, programsTask.Result), "Ok");
+                        // Show progress dialog for listing installed programs
+                        var uninstallProgressDialog = new Dialog("Loading Installed Programs...", 50, 8)
+                        {
+                            ColorScheme = Colors.Dialog
+                        };
+
+                        var uninstallProgressLabel = new Label("Scanning installed programs, please wait...")
+                        {
+                            X = Pos.Center(),
+                            Y = 1
+                        };
+                        uninstallProgressDialog.Add(uninstallProgressLabel);
+
+                        var cancelUninstallListButton = new Button("Cancel")
+                        {
+                            X = Pos.Center(),
+                            Y = 3
+                        };
+
+                        CancellationTokenSource? uninstallCts = new CancellationTokenSource();
+                        bool uninstallCompleted = false;
+
+                        cancelUninstallListButton.Clicked += () =>
+                        {
+                            uninstallCts?.Cancel();
+                            Application.RequestStop();
+                        };
+
+                        uninstallProgressDialog.AddButton(cancelUninstallListButton);
+
+                        // Run installed programs listing asynchronously with timeout
+                        var uninstallTask = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                var programs = await uninstallerService.ListInstalledPrograms();
+                                uninstallCompleted = true;
+
+                                Application.MainLoop.Invoke(() =>
+                                {
+                                    MessageBox.Query("Installed Programs", string.Join(Environment.NewLine, programs), "Ok");
+                                    Application.RequestStop(); // Close progress dialog
+                                });
+                            }
+                            catch (Exception ex)
+                            {
+                                Application.MainLoop.Invoke(() =>
+                                {
+                                    MessageBox.ErrorQuery("Error", $"Failed to list installed programs: {ex.Message}", "Ok");
+                                    Application.RequestStop(); // Close progress dialog
+                                });
+                            }
+                        }, uninstallCts.Token);
+
+                        // Add timeout
+                        var uninstallTimeoutTask = Task.Delay(30000, uninstallCts.Token); // 30 second timeout
+                        var uninstallCompletedTask = Task.WhenAny(uninstallTask, uninstallTimeoutTask).Result;
+
+                        if (uninstallCompletedTask == uninstallTimeoutTask && !uninstallCompleted)
+                        {
+                            uninstallCts?.Cancel();
+                            MessageBox.ErrorQuery("Timeout", "Listing installed programs timed out after 30 seconds.", "Ok");
+                        }
+                        else
+                        {
+                            Application.Run(uninstallProgressDialog);
+                        }
+
+                        uninstallCts?.Dispose();
                         break;
                     case "Uninstall Program":
                         var uninstallProgramInput = new TextField("")
@@ -1005,9 +1137,80 @@ namespace InvolveX.Cli
                         cts?.Dispose();
                         break;
                     case "Run Speed Test":
-                        var resultTask = networkService.RunSpeedTest();
-                        resultTask.Wait(); // Wait for completion
-                        MessageBox.Query("Speed Test Result", resultTask.Result, "Ok");
+                        // Show progress dialog for speed test
+                        var speedTestDialog = new Dialog("Running Speed Test...", 50, 8)
+                        {
+                            ColorScheme = Colors.Dialog
+                        };
+
+                        var progressLabel = new Label("Initializing speed test, please wait...")
+                        {
+                            X = Pos.Center(),
+                            Y = 1
+                        };
+                        speedTestDialog.Add(progressLabel);
+
+                        var cancelSpeedTestButton = new Button("Cancel")
+                        {
+                            X = Pos.Center(),
+                            Y = 3
+                        };
+
+                        CancellationTokenSource? speedTestCts = new CancellationTokenSource();
+                        bool speedTestCompleted = false;
+
+                        cancelSpeedTestButton.Clicked += () =>
+                        {
+                            speedTestCts?.Cancel();
+                            Application.RequestStop();
+                        };
+
+                        speedTestDialog.AddButton(cancelSpeedTestButton);
+
+                        // Run speed test asynchronously with timeout
+                        var speedTestTask = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                Application.MainLoop.Invoke(() =>
+                                {
+                                    progressLabel.Text = "Finding best server...";
+                                });
+
+                                var result = await networkService.RunSpeedTest();
+                                speedTestCompleted = true;
+
+                                Application.MainLoop.Invoke(() =>
+                                {
+                                    MessageBox.Query("Speed Test Result", result, "Ok");
+                                    Application.RequestStop(); // Close progress dialog
+                                });
+                            }
+                            catch (Exception ex)
+                            {
+                                Application.MainLoop.Invoke(() =>
+                                {
+                                    MessageBox.ErrorQuery("Speed Test Error", $"Speed test failed: {ex.Message}", "Ok");
+                                    Application.RequestStop(); // Close progress dialog
+                                });
+                            }
+                        }, speedTestCts.Token);
+
+                        // Add timeout
+                        var timeoutTask = Task.Delay(60000, speedTestCts.Token); // 60 second timeout
+                        var completedTask = Task.WhenAny(speedTestTask, timeoutTask).Result;
+
+                        if (completedTask == timeoutTask && !speedTestCompleted)
+                        {
+                            speedTestCts?.Cancel();
+                            MessageBox.ErrorQuery("Timeout", "Speed test timed out after 60 seconds.", "Ok");
+                        }
+                        else
+                        {
+                            Application.Run(speedTestDialog);
+                        }
+
+                        speedTestCts?.Dispose();
                         break;
                     case "Back":
                         Application.RequestStop();
@@ -1051,9 +1254,75 @@ namespace InvolveX.Cli
                 switch (selected)
                 {
                     case "Check for Driver Updates":
-                        var driversTask = driverService.DetectDrivers();
-                        driversTask.Wait(); // Wait for completion
-                        MessageBox.Query("Driver Updates", string.Join(Environment.NewLine, driversTask.Result), "Ok");
+                        // Show progress dialog for checking driver updates
+                        var driverProgressDialog = new Dialog("Checking for Driver Updates...", 50, 8)
+                        {
+                            ColorScheme = Colors.Dialog
+                        };
+
+                        var driverProgressLabel = new Label("Scanning for driver updates, please wait...")
+                        {
+                            X = Pos.Center(),
+                            Y = 1
+                        };
+                        driverProgressDialog.Add(driverProgressLabel);
+
+                        var cancelDriverCheckButton = new Button("Cancel")
+                        {
+                            X = Pos.Center(),
+                            Y = 3
+                        };
+
+                        CancellationTokenSource? driverCts = new CancellationTokenSource();
+                        bool driverCheckCompleted = false;
+
+                        cancelDriverCheckButton.Clicked += () =>
+                        {
+                            driverCts?.Cancel();
+                            Application.RequestStop();
+                        };
+
+                        driverProgressDialog.AddButton(cancelDriverCheckButton);
+
+                        // Run driver check asynchronously with timeout
+                        var driverCheckTask = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                var drivers = await driverService.DetectDrivers();
+                                driverCheckCompleted = true;
+
+                                Application.MainLoop.Invoke(() =>
+                                {
+                                    MessageBox.Query("Driver Updates", string.Join(Environment.NewLine, drivers), "Ok");
+                                    Application.RequestStop(); // Close progress dialog
+                                });
+                            }
+                            catch (Exception ex)
+                            {
+                                Application.MainLoop.Invoke(() =>
+                                {
+                                    MessageBox.ErrorQuery("Error", $"Failed to check for driver updates: {ex.Message}", "Ok");
+                                    Application.RequestStop(); // Close progress dialog
+                                });
+                            }
+                        }, driverCts.Token);
+
+                        // Add timeout
+                        var driverTimeoutTask = Task.Delay(30000, driverCts.Token); // 30 second timeout
+                        var driverCompletedTask = Task.WhenAny(driverCheckTask, driverTimeoutTask).Result;
+
+                        if (driverCompletedTask == driverTimeoutTask && !driverCheckCompleted)
+                        {
+                            driverCts?.Cancel();
+                            MessageBox.ErrorQuery("Timeout", "Driver check timed out after 30 seconds.", "Ok");
+                        }
+                        else
+                        {
+                            Application.Run(driverProgressDialog);
+                        }
+
+                        driverCts?.Dispose();
                         break;
                     case "Update Driver":
                         var driverNameInput = new TextField("")
