@@ -17,12 +17,21 @@ namespace InvolveX.Cli.Services
         {
             try
             {
+                // Validate host input
+                if (string.IsNullOrWhiteSpace(host))
+                {
+                    return "Error: Host cannot be empty";
+                }
+
+                // Use ping with 4 packets and timeout for better reliability
+                var arguments = $"-n 4 -w 5000 {host}";
+
                 var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = "ping",
-                        Arguments = host,
+                        Arguments = arguments,
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
@@ -40,7 +49,7 @@ namespace InvolveX.Cli.Services
 
                 if (process.ExitCode != 0)
                 {
-                    return $"Error running ping test. Exit Code: {process.ExitCode}\n{stderr}";
+                    return $"Ping test completed with warnings:\n{stdout}\n\nErrors:\n{stderr}";
                 }
 
                 return stdout;

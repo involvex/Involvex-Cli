@@ -915,7 +915,7 @@ namespace InvolveX.Cli
                 switch (selected)
                 {
                     case "Run Ping Test":
-                        var hostInput = new TextField("")
+                        var hostInput = new TextField("8.8.8.8") // Default to Google DNS
                         {
                             X = Pos.Center(),
                             Y = 3,
@@ -951,7 +951,7 @@ namespace InvolveX.Cli
                                 var task = networkService.RunPingTest(host);
                                 task.Wait(); // Wait for completion
                                 MessageBox.Query("Ping Test Result", task.Result, "Ok");
-                                Application.RequestStop(); // Close input dialog
+                                // Don't call Application.RequestStop() here - let user continue using the dialog
                             }
                             else
                             {
