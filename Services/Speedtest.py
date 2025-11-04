@@ -62,49 +62,57 @@ class SpeedtestService:
             print(f"Error finding best server: {e}", file=sys.stderr)
             return None
 
-    def test_download_speed(self, server_host, test_duration=15):
-        """Test download speed by downloading test files"""
+    def test_download_speed(self, server_host, test_duration=20):
+        """Test download speed by downloading test files for full duration"""
         try:
             print("Testing download speed...", file=sys.stderr)
 
-            # Try multiple test files of different sizes
+            # Use multiple test files to ensure continuous downloading
             test_files = [
-                f"http://{server_host}/speedtest/random350x350.jpg",
-                f"http://{server_host}/speedtest/random500x500.jpg",
                 f"http://{server_host}/speedtest/random750x750.jpg",
-                f"http://{server_host}/speedtest/random1000x1000.jpg"
+                f"http://{server_host}/speedtest/random1000x1000.jpg",
+                f"http://{server_host}/speedtest/random1500x1500.jpg",
+                f"http://{server_host}/speedtest/random2000x2000.jpg"
             ]
 
             total_bytes = 0
             start_time = time.time()
+            file_index = 0
 
-            for test_url in test_files:
+            # Continue downloading for the full test duration
+            while time.time() - start_time < test_duration and total_bytes < 50 * 1024 * 1024:  # Max 50MB
                 try:
-                    print(f"Testing with {test_url}", file=sys.stderr)
+                    # Cycle through test files
+                    test_url = test_files[file_index % len(test_files)]
+                    file_index += 1
+
+                    print(f"Downloading from {test_url}", file=sys.stderr)
                     req = Request(test_url, headers={'User-Agent': 'Mozilla/5.0'})
                     with urlopen(req, timeout=self.timeout) as response:
                         while time.time() - start_time < test_duration:
-                            chunk = response.read(8192)
+                            chunk = response.read(16384)  # Larger chunks for better throughput
                             if not chunk:
                                 break
                             total_bytes += len(chunk)
 
-                            # Break if we've downloaded enough data
-                            if total_bytes > 10 * 1024 * 1024:  # 10MB
+                            # Break this file if we've downloaded enough from it (to avoid huge files)
+                            if len(chunk) < 16384:  # End of file
                                 break
 
-                        # Close connection after each file
-                        break
+                        # Close connection and try next file
+                        continue
 
                 except (URLError, HTTPError, OSError) as e:
                     print(f"Failed to download from {test_url}: {e}", file=sys.stderr)
+                    # Try next file instead of giving up
                     continue
 
             elapsed_time = time.time() - start_time
-            if elapsed_time > 0 and total_bytes > 0:
+
+            if elapsed_time >= test_duration * 0.8 and total_bytes > 100000:  # At least 80% of test time and 100KB
                 # Convert bytes to bits per second, then to megabits per second
                 download_speed_mbps = (total_bytes * 8) / (elapsed_time * 1000000)
-                print(f"Downloaded {total_bytes} bytes in {elapsed_time:.1f}s", file=sys.stderr)
+                print(f"Downloaded {total_bytes:,} bytes in {elapsed_time:.1f}s", file=sys.stderr)
                 print(f"Download speed: {download_speed_mbps:.2f} Mbps", file=sys.stderr)
                 return max(download_speed_mbps, 0.1)  # Minimum 0.1 Mbps to avoid 0.00
 
