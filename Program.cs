@@ -95,6 +95,7 @@ namespace InvolveX.Cli
                 "DNS",
                 "Network",
                 "Driver",
+                "System Restore",
                 "Exit"
             };
 
@@ -134,6 +135,9 @@ namespace InvolveX.Cli
                         break;
                     case "Driver":
                         await ShowDriverSubmenu(); // New submenu
+                        break;
+                    case "System Restore":
+                        await ShowSystemRestoreSubmenu(); // New submenu
                         break;
                     case "Exit":
                         Application.RequestStop();
@@ -183,6 +187,7 @@ namespace InvolveX.Cli
             var updateOptions = new List<string>();
             updateOptions.AddRange(availableManagers);
             updateOptions.Add("PowerShell Modules");
+            updateOptions.Add("Update Specific Program");
             updateOptions.Add("Update All");
             updateOptions.Add("Back");
 
@@ -221,6 +226,9 @@ namespace InvolveX.Cli
                         break;
                     case "PowerShell Modules":
                         RunPackageManagerUpdateSync("PowerShell Modules", () => packageManagerService.UpdatePowerShellModules());
+                        break;
+                    case "Update Specific Program":
+                        ShowSpecificProgramUpdateDialog(packageManagerService, availableManagers);
                         break;
                     case "Update All":
                         RunUpdateAllSync(availableManagers, packageManagerService);
@@ -1400,6 +1408,422 @@ namespace InvolveX.Cli
             };
 
             Application.Run(driverSubmenu);
+        }
+
+        static async Task ShowSystemRestoreSubmenu()
+        {
+            var systemRestoreService = new SystemRestoreService(_logService);
+
+            var systemRestoreSubmenuItems = new List<string>
+            {
+                "Create Restore Point",
+                "List Restore Points",
+                "Delete Restore Point",
+                "Clean Old Restore Points",
+                "Back"
+            };
+
+            var systemRestoreSubmenu = new Dialog("System Restore Options", 60, 14)
+            {
+                ColorScheme = Colors.Dialog
+            };
+
+            var systemRestoreListView = new ListView(systemRestoreSubmenuItems)
+            {
+                X = 0,
+                Y = 0,
+                Width = Dim.Fill(),
+                Height = Dim.Fill(),
+                CanFocus = true,
+                ColorScheme = Colors.Dialog
+            };
+            systemRestoreSubmenu.Add(systemRestoreListView);
+
+            systemRestoreListView.OpenSelectedItem += (args) =>
+            {
+                var selected = systemRestoreSubmenuItems[args.Item];
+                switch (selected)
+                {
+                    case "Create Restore Point":
+                        var descriptionInput = new TextField("Manual System Restore Point")
+                        {
+                            X = Pos.Center(),
+                            Y = 3,
+                            Width = 35
+                        };
+
+                        var createDialog = new Dialog("Create Restore Point", 60, 10)
+                        {
+                            ColorScheme = Colors.Dialog
+                        };
+
+                        createDialog.Add(new Label("Enter description:") { X = Pos.Center(), Y = 1 });
+                        createDialog.Add(descriptionInput);
+
+                        var createButton = new Button("Create")
+                        {
+                            X = Pos.Center() - 10,
+                            Y = 5,
+                            IsDefault = true
+                        };
+
+                        var cancelCreateButton = new Button("Cancel")
+                        {
+                            X = Pos.Center() + 4,
+                            Y = 5
+                        };
+
+                        createButton.Clicked += () =>
+                        {
+                            var description = descriptionInput.Text.ToString();
+                            if (!string.IsNullOrEmpty(description))
+                            {
+                                var confirm = MessageBox.Query("Confirm",
+                                    $"Create system restore point: '{description}'?", "Yes", "No");
+                                if (confirm == 0) // "Yes" selected
+                                {
+                                    var progressDialog = new Dialog("Creating Restore Point...", 50, 8)
+                                    {
+                                        ColorScheme = Colors.Dialog
+                                    };
+
+                                    var progressLabel = new Label("Creating system restore point, please wait...")
+                                    {
+                                        X = Pos.Center(),
+                                        Y = 1
+                                    };
+                                    progressDialog.Add(progressLabel);
+
+                                    Application.Run(progressDialog);
+
+                                    var successTask = systemRestoreService.CreateRestorePoint(description);
+                                    successTask.Wait(); // Wait for completion
+                                    if (successTask.Result)
+                                    {
+                                        MessageBox.Query("Success", "System restore point created successfully!", "Ok");
+                                    }
+                                    else
+                                    {
+                                        MessageBox.ErrorQuery("Error", "Failed to create system restore point.", "Ok");
+                                    }
+                                    Application.RequestStop(); // Close input dialog
+                                }
+                            }
+                            else
+                            {
+                                MessageBox.ErrorQuery("Error", "Description cannot be empty", "Ok");
+                            }
+                        };
+
+                        cancelCreateButton.Clicked += () => Application.RequestStop();
+
+                        createDialog.AddButton(createButton);
+                        createDialog.AddButton(cancelCreateButton);
+
+                        Application.Run(createDialog);
+                        break;
+                    case "List Restore Points":
+                        // Show progress dialog for listing restore points
+                        var listProgressDialog = new Dialog("Loading Restore Points...", 50, 8)
+                        {
+                            ColorScheme = Colors.Dialog
+                        };
+
+                        var listProgressLabel = new Label("Retrieving restore points, please wait...")
+                        {
+                            X = Pos.Center(),
+                            Y = 1
+                        };
+                        listProgressDialog.Add(listProgressLabel);
+
+                        var cancelListButton = new Button("Cancel")
+                        {
+                            X = Pos.Center(),
+                            Y = 3
+                        };
+
+                        CancellationTokenSource? listCts = new CancellationTokenSource();
+                        bool listCompleted = false;
+
+                        cancelListButton.Clicked += () =>
+                        {
+                            listCts?.Cancel();
+                            Application.RequestStop();
+                        };
+
+                        listProgressDialog.AddButton(cancelListButton);
+
+                        // Run restore points listing asynchronously with timeout
+                        var listTask = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                var restorePoints = await systemRestoreService.ListRestorePoints();
+                                listCompleted = true;
+
+                                Application.MainLoop.Invoke(() =>
+                                {
+                                    MessageBox.Query("System Restore Points", restorePoints, "Ok");
+                                    Application.RequestStop(); // Close progress dialog
+                                });
+                            }
+                            catch (Exception ex)
+                            {
+                                Application.MainLoop.Invoke(() =>
+                                {
+                                    MessageBox.ErrorQuery("Error", $"Failed to list restore points: {ex.Message}", "Ok");
+                                    Application.RequestStop(); // Close progress dialog
+                                });
+                            }
+                        }, listCts.Token);
+
+                        // Add timeout
+                        var listTimeoutTask = Task.Delay(30000, listCts.Token); // 30 second timeout
+                        var listCompletedTask = Task.WhenAny(listTask, listTimeoutTask).Result;
+
+                        if (listCompletedTask == listTimeoutTask && !listCompleted)
+                        {
+                            listCts?.Cancel();
+                            MessageBox.ErrorQuery("Timeout", "Listing restore points timed out after 30 seconds.", "Ok");
+                        }
+                        else
+                        {
+                            Application.Run(listProgressDialog);
+                        }
+
+                        listCts?.Dispose();
+                        break;
+                    case "Delete Restore Point":
+                        var sequenceInput = new TextField("")
+                        {
+                            X = Pos.Center(),
+                            Y = 3,
+                            Width = 10
+                        };
+
+                        var deleteDialog = new Dialog("Delete Restore Point", 50, 10)
+                        {
+                            ColorScheme = Colors.Dialog
+                        };
+
+                        deleteDialog.Add(new Label("Enter sequence number:") { X = Pos.Center(), Y = 1 });
+                        deleteDialog.Add(sequenceInput);
+
+                        var deleteButton = new Button("Delete")
+                        {
+                            X = Pos.Center() - 10,
+                            Y = 5,
+                            IsDefault = true
+                        };
+
+                        var cancelDeleteButton = new Button("Cancel")
+                        {
+                            X = Pos.Center() + 2,
+                            Y = 5
+                        };
+
+                        deleteButton.Clicked += () =>
+                        {
+                            if (int.TryParse(sequenceInput.Text.ToString(), out int sequenceNumber))
+                            {
+                                var confirm = MessageBox.Query("Confirm",
+                                    $"Delete restore point with sequence number {sequenceNumber}?", "Yes", "No");
+                                if (confirm == 0) // "Yes" selected
+                                {
+                                    var progressDialog = new Dialog("Deleting Restore Point...", 50, 8)
+                                    {
+                                        ColorScheme = Colors.Dialog
+                                    };
+
+                                    var progressLabel = new Label("Deleting restore point, please wait...")
+                                    {
+                                        X = Pos.Center(),
+                                        Y = 1
+                                    };
+                                    progressDialog.Add(progressLabel);
+
+                                    Application.Run(progressDialog);
+
+                                    var successTask = systemRestoreService.DeleteRestorePoint(sequenceNumber);
+                                    successTask.Wait(); // Wait for completion
+                                    if (successTask.Result)
+                                    {
+                                        MessageBox.Query("Success", "Restore point deleted successfully!", "Ok");
+                                    }
+                                    else
+                                    {
+                                        MessageBox.ErrorQuery("Error", "Failed to delete restore point.", "Ok");
+                                    }
+                                    Application.RequestStop(); // Close input dialog
+                                }
+                            }
+                            else
+                            {
+                                MessageBox.ErrorQuery("Error", "Please enter a valid sequence number", "Ok");
+                            }
+                        };
+
+                        cancelDeleteButton.Clicked += () => Application.RequestStop();
+
+                        deleteDialog.AddButton(deleteButton);
+                        deleteDialog.AddButton(cancelDeleteButton);
+
+                        Application.Run(deleteDialog);
+                        break;
+                    case "Clean Old Restore Points":
+                        var confirm = MessageBox.Query("Confirm",
+                            "Delete old restore points (keep 5 most recent)?", "Yes", "No");
+                        if (confirm == 0) // "Yes" selected
+                        {
+                            var progressDialog = new Dialog("Cleaning Restore Points...", 50, 8)
+                            {
+                                ColorScheme = Colors.Dialog
+                            };
+
+                            var progressLabel = new Label("Cleaning old restore points, please wait...")
+                            {
+                                X = Pos.Center(),
+                                Y = 1
+                            };
+                            progressDialog.Add(progressLabel);
+
+                            Application.Run(progressDialog);
+
+                            var successTask = systemRestoreService.DeleteOldRestorePoints(5);
+                            successTask.Wait(); // Wait for completion
+                            if (successTask.Result)
+                            {
+                                MessageBox.Query("Success", "Old restore points cleaned successfully!", "Ok");
+                            }
+                            else
+                            {
+                                MessageBox.ErrorQuery("Error", "Failed to clean old restore points.", "Ok");
+                            }
+                        }
+                        break;
+                    case "Back":
+                        Application.RequestStop();
+                        break;
+                }
+            };
+
+            Application.Run(systemRestoreSubmenu);
+        }
+
+        static void ShowSpecificProgramUpdateDialog(PackageManagerService packageManagerService, List<string> availableManagers)
+        {
+            var programNameInput = new TextField("")
+            {
+                X = Pos.Center(),
+                Y = 3,
+                Width = 30
+            };
+
+            var managerList = new ListView(availableManagers)
+            {
+                X = Pos.Center(),
+                Y = 6,
+                Width = 20,
+                Height = 4,
+                CanFocus = true,
+                ColorScheme = Colors.Dialog
+            };
+
+            var updateDialog = new Dialog("Update Specific Program", 60, 15)
+            {
+                ColorScheme = Colors.Dialog
+            };
+
+            updateDialog.Add(new Label("Enter program name to update:") { X = Pos.Center(), Y = 1 });
+            updateDialog.Add(programNameInput);
+            updateDialog.Add(new Label("Select package manager:") { X = Pos.Center(), Y = 5 });
+
+            var updateButton = new Button("Update")
+            {
+                X = Pos.Center() - 10,
+                Y = 11,
+                IsDefault = true
+            };
+
+            var cancelButton = new Button("Cancel")
+            {
+                X = Pos.Center() + 4,
+                Y = 11
+            };
+
+            updateButton.Clicked += () =>
+            {
+                var programName = programNameInput.Text.ToString();
+                var selectedManagerIndex = managerList.SelectedItem;
+                var selectedManager = availableManagers[selectedManagerIndex];
+
+                if (!string.IsNullOrEmpty(programName))
+                {
+                    var confirm = MessageBox.Query("Confirm Update",
+                        $"Update '{programName}' using {selectedManager}?", "Yes", "No");
+                    if (confirm == 0) // "Yes" selected
+                    {
+                        // Run the update operation
+                        try
+                        {
+                            Task updateTask;
+                            switch (selectedManager)
+                            {
+                                case "winget":
+                                    updateTask = packageManagerService.UpdateSpecificProgramWithWinget(programName);
+                                    break;
+                                case "npm":
+                                    updateTask = packageManagerService.UpdateSpecificProgramWithNpm(programName);
+                                    break;
+                                case "scoop":
+                                    updateTask = packageManagerService.UpdateSpecificProgramWithScoop(programName);
+                                    break;
+                                case "choco":
+                                    updateTask = packageManagerService.UpdateSpecificProgramWithChoco(programName);
+                                    break;
+                                default:
+                                    MessageBox.ErrorQuery("Error", "Unsupported package manager selected.", "Ok");
+                                    return;
+                            }
+
+                            var progressDialog = new Dialog($"Updating {programName}...", 50, 8)
+                            {
+                                ColorScheme = Colors.Dialog
+                            };
+
+                            var progressLabel = new Label($"Updating {programName} with {selectedManager}, please wait...")
+                            {
+                                X = Pos.Center(),
+                                Y = 1
+                            };
+                            progressDialog.Add(progressLabel);
+
+                            Application.Run(progressDialog);
+
+                            updateTask.Wait(); // Wait for completion
+
+                            MessageBox.Query("Success", $"{programName} update completed successfully!", "Ok");
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.ErrorQuery("Error", $"Failed to update {programName}: {ex.Message}", "Ok");
+                        }
+                        Application.RequestStop(); // Close input dialog
+                    }
+                }
+                else
+                {
+                    MessageBox.ErrorQuery("Error", "Program name cannot be empty", "Ok");
+                }
+            };
+
+            cancelButton.Clicked += () => Application.RequestStop();
+
+            updateDialog.AddButton(updateButton);
+            updateDialog.AddButton(cancelButton);
+            updateDialog.Add(managerList);
+
+            Application.Run(updateDialog);
         }
 
         // Method to show funding information

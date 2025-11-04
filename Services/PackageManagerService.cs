@@ -24,6 +24,11 @@ namespace InvolveX.Cli.Services
         public async Task UpdateScoop() => await RunUpdateCommand("scoop", "update");
         public async Task UpdateChoco() => await RunUpdateCommand("choco", "upgrade all -y");
 
+        public async Task UpdateSpecificProgramWithWinget(string programName) => await RunUpdateCommand("winget", $"upgrade {programName}");
+        public async Task UpdateSpecificProgramWithNpm(string programName) => await RunUpdateCommand("npm", $"update -g {programName}");
+        public async Task UpdateSpecificProgramWithScoop(string programName) => await RunUpdateCommand("scoop", $"update {programName}");
+        public async Task UpdateSpecificProgramWithChoco(string programName) => await RunUpdateCommand("choco", $"upgrade {programName} -y");
+
         public async Task UpdatePowerShellModules()
         {
             _logService.Log("Updating PowerShell modules.");
