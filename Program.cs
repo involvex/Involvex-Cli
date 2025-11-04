@@ -60,6 +60,14 @@ namespace InvolveX.Cli
             });
             top.Add(statusBar);
 
+            // Add global key handler for F10 to ensure it works from anywhere
+            top.KeyDown += (e) => {
+                if (e.KeyEvent.Key == Key.F10) {
+                    Application.RequestStop();
+                    e.Handled = true;
+                }
+            };
+
             // InvolveX ASCII art logo
             var logo = new Label()
             {
@@ -133,7 +141,7 @@ namespace InvolveX.Cli
                 }
             };
 
-            await Task.Run(() => Application.Run()); // Run the application on a separate thread
+            Application.Run(); // Run the application on the main thread
             Application.Shutdown();
         }
 
