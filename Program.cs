@@ -496,7 +496,7 @@ namespace InvolveX.Cli
             };
             cacheSubmenu.Add(cacheListView);
 
-            cacheListView.OpenSelectedItem += async (args) => // Changed to async
+            cacheListView.OpenSelectedItem += (args) =>
             {
                 var selected = cacheSubmenuItems[args.Item];
                 switch (selected)
@@ -509,21 +509,12 @@ namespace InvolveX.Cli
                             var spinner = new Label("Clearing caches...") { X = Pos.Center(), Y = 1 };
                             progressDialog.Add(spinner);
 
-                            var dialogClosed = new TaskCompletionSource<bool>();
-                            _ = Task.Run(() =>
-                            {
-                                Application.Run(progressDialog);
-                                dialogClosed.SetResult(true);
-                            });
+                            Application.Run(progressDialog);
 
-                            await cacheService.ClearSystemCache();
+                            var task = cacheService.ClearSystemCache();
+                            task.Wait(); // Wait for completion
 
-                            Application.MainLoop.Invoke(() =>
-                            {
-                                MessageBox.Query("Success", "Caches cleared successfully!", "Ok");
-                                Application.RequestStop(); // Close progress dialog
-                            });
-                            await dialogClosed.Task;
+                            MessageBox.Query("Success", "Caches cleared successfully!", "Ok");
                         }
                         break;
                     case "Back":
@@ -532,14 +523,7 @@ namespace InvolveX.Cli
                 }
             };
 
-            var dialogClosed = new TaskCompletionSource<bool>();
-            _ = Task.Run(() =>
-            {
-                Application.Run(cacheSubmenu);
-                dialogClosed.SetResult(true);
-            });
-
-            await dialogClosed.Task;
+            Application.Run(cacheSubmenu);
         }
 
         static async Task ShowStartupSubmenu()
@@ -569,24 +553,15 @@ namespace InvolveX.Cli
             };
             startupSubmenu.Add(startupListView);
 
-            var dialogClosed = new TaskCompletionSource<bool>();
-            _ = Task.Run(() =>
-            {
-                Application.Run(startupSubmenu);
-                dialogClosed.SetResult(true);
-            });
-
-            startupListView.OpenSelectedItem += async (args) =>
+            startupListView.OpenSelectedItem += (args) =>
             {
                 var selected = startupSubmenuItems[args.Item];
                 switch (selected)
                 {
                     case "List Startup Programs":
-                        var programs = await startupService.ListStartupPrograms();
-                        Application.MainLoop.Invoke(() =>
-                        {
-                            MessageBox.Query("Startup Programs", string.Join(Environment.NewLine, programs), "Ok");
-                        });
+                        var programsTask = startupService.ListStartupPrograms();
+                        programsTask.Wait(); // Wait for completion
+                        MessageBox.Query("Startup Programs", string.Join(Environment.NewLine, programsTask.Result), "Ok");
                         break;
                     case "Disable Startup Program":
                         var programNameInput = new TextField("")
@@ -617,31 +592,26 @@ namespace InvolveX.Cli
                             Y = 5
                         };
 
-                        disableButton.Clicked += async () =>
+                        disableButton.Clicked += () =>
                         {
                             var programName = programNameInput.Text.ToString();
                             if (!string.IsNullOrEmpty(programName))
                             {
-                                var success = await startupService.DisableStartupProgram(programName);
-                                Application.MainLoop.Invoke(() =>
+                                var successTask = startupService.DisableStartupProgram(programName);
+                                successTask.Wait(); // Wait for completion
+                                if (successTask.Result)
                                 {
-                                    if (success)
-                                    {
-                                        MessageBox.Query("Success", $"Successfully disabled startup program: {programName}", "Ok");
-                                    }
-                                    else
-                                    {
-                                        MessageBox.ErrorQuery("Error", $"Failed to disable startup program: {programName}", "Ok");
-                                    }
-                                    Application.RequestStop(); // Close input dialog
-                                });
+                                    MessageBox.Query("Success", $"Successfully disabled startup program: {programName}", "Ok");
+                                }
+                                else
+                                {
+                                    MessageBox.ErrorQuery("Error", $"Failed to disable startup program: {programName}", "Ok");
+                                }
+                                Application.RequestStop(); // Close input dialog
                             }
                             else
                             {
-                                Application.MainLoop.Invoke(() =>
-                                {
-                                    MessageBox.ErrorQuery("Error", "Program name cannot be empty", "Ok");
-                                });
+                                MessageBox.ErrorQuery("Error", "Program name cannot be empty", "Ok");
                             }
                         };
 
@@ -650,21 +620,15 @@ namespace InvolveX.Cli
                         disableDialog.AddButton(disableButton);
                         disableDialog.AddButton(cancelButton);
 
-                        var dialogClosed = new TaskCompletionSource<bool>();
-                        _ = Task.Run(() =>
-                        {
-                            Application.Run(disableDialog);
-                            dialogClosed.SetResult(true);
-                        });
-
-                        await dialogClosed.Task;
+                        Application.Run(disableDialog);
                         break;
                     case "Back":
-                        Application.MainLoop.Invoke(() => Application.RequestStop());
+                        Application.RequestStop();
                         break;
                 }
             };
-            await dialogClosed.Task;
+
+            Application.Run(startupSubmenu);
         }
 
         static async Task ShowUninstallSubmenu()
@@ -694,24 +658,15 @@ namespace InvolveX.Cli
             };
             uninstallSubmenu.Add(uninstallListView);
 
-            var dialogClosed = new TaskCompletionSource<bool>();
-            _ = Task.Run(() =>
-            {
-                Application.Run(uninstallSubmenu);
-                dialogClosed.SetResult(true);
-            });
-
-            uninstallListView.OpenSelectedItem += async (args) =>
+            uninstallListView.OpenSelectedItem += (args) =>
             {
                 var selected = uninstallSubmenuItems[args.Item];
                 switch (selected)
                 {
                     case "List Installed Programs":
-                        var programs = await uninstallerService.ListInstalledPrograms();
-                        Application.MainLoop.Invoke(() =>
-                        {
-                            MessageBox.Query("Installed Programs", string.Join(Environment.NewLine, programs), "Ok");
-                        });
+                        var programsTask = uninstallerService.ListInstalledPrograms();
+                        programsTask.Wait(); // Wait for completion
+                        MessageBox.Query("Installed Programs", string.Join(Environment.NewLine, programsTask.Result), "Ok");
                         break;
                     case "Uninstall Program":
                         var uninstallProgramInput = new TextField("")
@@ -742,7 +697,7 @@ namespace InvolveX.Cli
                             Y = 5
                         };
 
-                        uninstallButton.Clicked += async () =>
+                        uninstallButton.Clicked += () =>
                         {
                             var programName = uninstallProgramInput.Text.ToString();
                             if (!string.IsNullOrEmpty(programName))
@@ -751,27 +706,22 @@ namespace InvolveX.Cli
                                     $"Are you sure you want to uninstall '{programName}'?", "Yes", "No");
                                 if (confirm == 0) // "Yes" selected
                                 {
-                                    var success = await uninstallerService.UninstallProgram(programName);
-                                    Application.MainLoop.Invoke(() =>
+                                    var successTask = uninstallerService.UninstallProgram(programName);
+                                    successTask.Wait(); // Wait for completion
+                                    if (successTask.Result)
                                     {
-                                        if (success)
-                                        {
-                                            MessageBox.Query("Success", $"Successfully initiated uninstall for: {programName}", "Ok");
-                                        }
-                                        else
-                                        {
-                                            MessageBox.ErrorQuery("Error", $"Failed to uninstall: {programName}", "Ok");
-                                        }
-                                        Application.RequestStop(); // Close input dialog
-                                    });
+                                        MessageBox.Query("Success", $"Successfully initiated uninstall for: {programName}", "Ok");
+                                    }
+                                    else
+                                    {
+                                        MessageBox.ErrorQuery("Error", $"Failed to uninstall: {programName}", "Ok");
+                                    }
+                                    Application.RequestStop(); // Close input dialog
                                 }
                             }
                             else
                             {
-                                Application.MainLoop.Invoke(() =>
-                                {
-                                    MessageBox.ErrorQuery("Error", "Program name cannot be empty", "Ok");
-                                });
+                                MessageBox.ErrorQuery("Error", "Program name cannot be empty", "Ok");
                             }
                         };
 
@@ -780,21 +730,15 @@ namespace InvolveX.Cli
                         uninstallDialog.AddButton(uninstallButton);
                         uninstallDialog.AddButton(cancelUninstallButton);
 
-                        var uninstallDialogClosed = new TaskCompletionSource<bool>();
-                        _ = Task.Run(() =>
-                        {
-                            Application.Run(uninstallDialog);
-                            uninstallDialogClosed.SetResult(true);
-                        });
-
-                        await uninstallDialogClosed.Task;
+                        Application.Run(uninstallDialog);
                         break;
                     case "Back":
-                        Application.MainLoop.Invoke(() => Application.RequestStop());
+                        Application.RequestStop();
                         break;
                 }
             };
-            await dialogClosed.Task;
+
+            Application.Run(uninstallSubmenu);
         }
 
         static async Task ShowDnsSubmenu()
@@ -824,14 +768,7 @@ namespace InvolveX.Cli
             };
             dnsSubmenu.Add(dnsListView);
 
-            var dialogClosed = new TaskCompletionSource<bool>();
-            _ = Task.Run(() =>
-            {
-                Application.Run(dnsSubmenu);
-                dialogClosed.SetResult(true);
-            });
-
-            dnsListView.OpenSelectedItem += async (args) =>
+            dnsListView.OpenSelectedItem += (args) =>
             {
                 var selected = dnsSubmenuItems[args.Item];
                 switch (selected)
@@ -874,7 +811,7 @@ namespace InvolveX.Cli
                             Y = 6
                         };
 
-                        setDnsButton.Clicked += async () =>
+                        setDnsButton.Clicked += () =>
                         {
                             var primaryDns = primaryDnsInput.Text.ToString();
                             var secondaryDns = secondaryDnsInput.Text.ToString();
@@ -888,27 +825,22 @@ namespace InvolveX.Cli
 
                                 if (confirm == 0) // "Yes" selected
                                 {
-                                    var success = await dnsService.SetDns(primaryDns, secondaryDns);
-                                    Application.MainLoop.Invoke(() =>
+                                    var successTask = dnsService.SetDns(primaryDns, secondaryDns);
+                                    successTask.Wait(); // Wait for completion
+                                    if (successTask.Result)
                                     {
-                                        if (success)
-                                        {
-                                            MessageBox.Query("Success", "DNS settings updated successfully!", "Ok");
-                                        }
-                                        else
-                                        {
-                                            MessageBox.ErrorQuery("Error", "Failed to update DNS settings.", "Ok");
-                                        }
-                                        Application.RequestStop(); // Close input dialog
-                                    });
+                                        MessageBox.Query("Success", "DNS settings updated successfully!", "Ok");
+                                    }
+                                    else
+                                    {
+                                        MessageBox.ErrorQuery("Error", "Failed to update DNS settings.", "Ok");
+                                    }
+                                    Application.RequestStop(); // Close input dialog
                                 }
                             }
                             else
                             {
-                                Application.MainLoop.Invoke(() =>
-                                {
-                                    MessageBox.ErrorQuery("Error", "Primary DNS cannot be empty", "Ok");
-                                });
+                                MessageBox.ErrorQuery("Error", "Primary DNS cannot be empty", "Ok");
                             }
                         };
 
@@ -917,14 +849,7 @@ namespace InvolveX.Cli
                         dnsDialog.AddButton(setDnsButton);
                         dnsDialog.AddButton(cancelDnsButton);
 
-                        var dnsDialogClosed = new TaskCompletionSource<bool>();
-                        _ = Task.Run(() =>
-                        {
-                            Application.Run(dnsDialog);
-                            dnsDialogClosed.SetResult(true);
-                        });
-
-                        await dnsDialogClosed.Task;
+                        Application.Run(dnsDialog);
                         break;
                     case "Reset DNS":
                         var confirm = MessageBox.Query("Confirm", "Are you sure you want to reset DNS settings?", "Yes", "No");
@@ -934,35 +859,27 @@ namespace InvolveX.Cli
                             var spinner = new Label("Resetting DNS settings...") { X = Pos.Center(), Y = 1 };
                             progressDialog.Add(spinner);
 
-                            var progressDialogClosed = new TaskCompletionSource<bool>();
-                            _ = Task.Run(() =>
-                            {
-                                Application.Run(progressDialog);
-                                progressDialogClosed.SetResult(true);
-                            });
+                            Application.Run(progressDialog);
 
-                            var success = await dnsService.ResetDns();
-                            Application.MainLoop.Invoke(() =>
+                            var successTask = dnsService.ResetDns();
+                            successTask.Wait(); // Wait for completion
+                            if (successTask.Result)
                             {
-                                if (success)
-                                {
-                                    MessageBox.Query("Success", "DNS settings reset successfully!", "Ok");
-                                }
-                                else
-                                {
-                                    MessageBox.ErrorQuery("Error", "Failed to reset DNS settings.", "Ok");
-                                }
-                                Application.RequestStop(); // Close progress dialog
-                            });
-                            await progressDialogClosed.Task;
+                                MessageBox.Query("Success", "DNS settings reset successfully!", "Ok");
+                            }
+                            else
+                            {
+                                MessageBox.ErrorQuery("Error", "Failed to reset DNS settings.", "Ok");
+                            }
                         }
                         break;
                     case "Back":
-                        Application.MainLoop.Invoke(() => Application.RequestStop());
+                        Application.RequestStop();
                         break;
                 }
             };
-            await dialogClosed.Task;
+
+            Application.Run(dnsSubmenu);
         }
 
         static async Task ShowNetworkSubmenu()
@@ -992,14 +909,7 @@ namespace InvolveX.Cli
             };
             networkSubmenu.Add(networkListView);
 
-            var dialogClosed = new TaskCompletionSource<bool>();
-            _ = Task.Run(() =>
-            {
-                Application.Run(networkSubmenu);
-                dialogClosed.SetResult(true);
-            });
-
-            networkListView.OpenSelectedItem += async (args) =>
+            networkListView.OpenSelectedItem += (args) =>
             {
                 var selected = networkSubmenuItems[args.Item];
                 switch (selected)
@@ -1033,24 +943,19 @@ namespace InvolveX.Cli
                             Y = 5
                         };
 
-                        pingButton.Clicked += async () =>
+                        pingButton.Clicked += () =>
                         {
                             var host = hostInput.Text.ToString();
                             if (!string.IsNullOrEmpty(host))
                             {
-                                var result = await networkService.RunPingTest(host);
-                                Application.MainLoop.Invoke(() =>
-                                {
-                                    MessageBox.Query("Ping Test Result", result, "Ok");
-                                    Application.RequestStop(); // Close input dialog
-                                });
+                                var task = networkService.RunPingTest(host);
+                                task.Wait(); // Wait for completion
+                                MessageBox.Query("Ping Test Result", task.Result, "Ok");
+                                Application.RequestStop(); // Close input dialog
                             }
                             else
                             {
-                                Application.MainLoop.Invoke(() =>
-                                {
-                                    MessageBox.ErrorQuery("Error", "Host cannot be empty", "Ok");
-                                });
+                                MessageBox.ErrorQuery("Error", "Host cannot be empty", "Ok");
                             }
                         };
 
@@ -1059,28 +964,20 @@ namespace InvolveX.Cli
                         pingDialog.AddButton(pingButton);
                         pingDialog.AddButton(cancelPingButton);
 
-                        var pingDialogClosed = new TaskCompletionSource<bool>();
-                        _ = Task.Run(() =>
-                        {
-                            Application.Run(pingDialog);
-                            pingDialogClosed.SetResult(true);
-                        });
-
-                        await pingDialogClosed.Task;
+                        Application.Run(pingDialog);
                         break;
                     case "Run Speed Test":
-                        var result = await networkService.RunSpeedTest();
-                        Application.MainLoop.Invoke(() =>
-                        {
-                            MessageBox.Query("Speed Test Result", result, "Ok");
-                        });
+                        var resultTask = networkService.RunSpeedTest();
+                        resultTask.Wait(); // Wait for completion
+                        MessageBox.Query("Speed Test Result", resultTask.Result, "Ok");
                         break;
                     case "Back":
-                        Application.MainLoop.Invoke(() => Application.RequestStop());
+                        Application.RequestStop();
                         break;
                 }
             };
-            await dialogClosed.Task;
+
+            Application.Run(networkSubmenu);
         }
 
         static async Task ShowDriverSubmenu()
@@ -1110,24 +1007,15 @@ namespace InvolveX.Cli
             };
             driverSubmenu.Add(driverListView);
 
-            var dialogClosed = new TaskCompletionSource<bool>();
-            _ = Task.Run(() =>
-            {
-                Application.Run(driverSubmenu);
-                dialogClosed.SetResult(true);
-            });
-
-            driverListView.OpenSelectedItem += async (args) =>
+            driverListView.OpenSelectedItem += (args) =>
             {
                 var selected = driverSubmenuItems[args.Item];
                 switch (selected)
                 {
                     case "Check for Driver Updates":
-                        var drivers = await driverService.DetectDrivers();
-                        Application.MainLoop.Invoke(() =>
-                        {
-                            MessageBox.Query("Driver Updates", string.Join(Environment.NewLine, drivers), "Ok");
-                        });
+                        var driversTask = driverService.DetectDrivers();
+                        driversTask.Wait(); // Wait for completion
+                        MessageBox.Query("Driver Updates", string.Join(Environment.NewLine, driversTask.Result), "Ok");
                         break;
                     case "Update Driver":
                         var driverNameInput = new TextField("")
@@ -1158,7 +1046,7 @@ namespace InvolveX.Cli
                             Y = 5
                         };
 
-                        updateDriverButton.Clicked += async () =>
+                        updateDriverButton.Clicked += () =>
                         {
                             var driverName = driverNameInput.Text.ToString();
                             if (!string.IsNullOrEmpty(driverName))
@@ -1167,27 +1055,22 @@ namespace InvolveX.Cli
                                     $"Are you sure you want to update driver '{driverName}'?", "Yes", "No");
                                 if (confirm == 0) // "Yes" selected
                                 {
-                                    var success = await driverService.UpdateDriver(driverName);
-                                    Application.MainLoop.Invoke(() =>
+                                    var successTask = driverService.UpdateDriver(driverName);
+                                    successTask.Wait(); // Wait for completion
+                                    if (successTask.Result)
                                     {
-                                        if (success)
-                                        {
-                                            MessageBox.Query("Success", $"Driver update initiated for: {driverName}", "Ok");
-                                        }
-                                        else
-                                        {
-                                            MessageBox.ErrorQuery("Error", $"Failed to update driver: {driverName}", "Ok");
-                                        }
-                                        Application.RequestStop(); // Close input dialog
-                                    });
+                                        MessageBox.Query("Success", $"Driver update initiated for: {driverName}", "Ok");
+                                    }
+                                    else
+                                    {
+                                        MessageBox.ErrorQuery("Error", $"Failed to update driver: {driverName}", "Ok");
+                                    }
+                                    Application.RequestStop(); // Close input dialog
                                 }
                             }
                             else
                             {
-                                Application.MainLoop.Invoke(() =>
-                                {
-                                    MessageBox.ErrorQuery("Error", "Driver name cannot be empty", "Ok");
-                                });
+                                MessageBox.ErrorQuery("Error", "Driver name cannot be empty", "Ok");
                             }
                         };
 
@@ -1196,21 +1079,15 @@ namespace InvolveX.Cli
                         driverDialog.AddButton(updateDriverButton);
                         driverDialog.AddButton(cancelDriverButton);
 
-                        var driverDialogClosed = new TaskCompletionSource<bool>();
-                        _ = Task.Run(() =>
-                        {
-                            Application.Run(driverDialog);
-                            driverDialogClosed.SetResult(true);
-                        });
-
-                        await driverDialogClosed.Task;
+                        Application.Run(driverDialog);
                         break;
                     case "Back":
-                        Application.MainLoop.Invoke(() => Application.RequestStop());
+                        Application.RequestStop();
                         break;
                 }
             };
-            await dialogClosed.Task;
+
+            Application.Run(driverSubmenu);
         }
 
         // Method to show funding information
