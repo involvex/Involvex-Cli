@@ -150,50 +150,22 @@ namespace InvolveX.Cli
         static async Task ShowUpdateMenu()
         {
             var packageManagerService = new PackageManagerService(_logService);
-            var systemRestoreService = new SystemRestoreService(_logService);
 
-            var updateDialog = new Dialog("Update Options", 80, 20)
-            {
-                ColorScheme = Colors.Dialog
-            };
-
-            var messageLabel = new Label("Checking for installed package managers...")
-            {
-                X = Pos.Center(),
-                Y = 1
-            };
-            updateDialog.Add(messageLabel);
-
-            // Create a TaskCompletionSource to signal when the dialog should close
-            var dialogClosed = new TaskCompletionSource<bool>();
-
-            // Run the dialog in a separate task to avoid blocking the main thread
-            _ = Task.Run(() =>
-            {
-                Application.Run(updateDialog);
-                dialogClosed.SetResult(true); // Signal that the dialog has been closed
-            });
-
-            var packageManagers = new List<string>();
+            // Check which package managers are available
+            var availableManagers = new List<string>();
             try
             {
-                var wingetTask = packageManagerService.IsWingetInstalled();
-                var npmTask = packageManagerService.IsNpmInstalled();
-                var scoopTask = packageManagerService.IsScoopInstalled();
-                var chocoTask = packageManagerService.IsChocoInstalled();
+                var checks = await Task.WhenAll(
+                    packageManagerService.IsWingetInstalled(),
+                    packageManagerService.IsNpmInstalled(),
+                    packageManagerService.IsScoopInstalled(),
+                    packageManagerService.IsChocoInstalled()
+                );
 
-                await Task.WhenAll(wingetTask, npmTask, scoopTask, chocoTask);
-
-                if (await wingetTask) packageManagers.Add("winget");
-                if (await npmTask) packageManagers.Add("npm");
-                if (await scoopTask) packageManagers.Add("scoop");
-                if (await chocoTask) packageManagers.Add("choco");
-
-                Application.MainLoop.Invoke(() =>
-                {
-                    messageLabel.Text = $"Found the following package managers: {string.Join(", ", packageManagers)}";
-                    MessageBox.Query("Update", "Update logic not fully implemented yet. Found: " + string.Join(", ", packageManagers), "Ok");
-                });
+                if (checks[0]) availableManagers.Add("winget");
+                if (checks[1]) availableManagers.Add("npm");
+                if (checks[2]) availableManagers.Add("scoop");
+                if (checks[3]) availableManagers.Add("choco");
             }
             catch (Exception ex)
             {
@@ -201,13 +173,230 @@ namespace InvolveX.Cli
                 {
                     MessageBox.ErrorQuery("Error", $"Error checking package managers: {ex.Message}", "Ok");
                 });
+                return;
             }
-            finally
+
+            if (availableManagers.Count == 0)
             {
-                // Request stop for the dialog and wait for it to close
-                Application.MainLoop.Invoke(() => Application.RequestStop());
-                await dialogClosed.Task; // Wait for the dialog to actually close
+                Application.MainLoop.Invoke(() =>
+                {
+                    MessageBox.ErrorQuery("No Package Managers", "No supported package managers found on this system.", "Ok");
+                });
+                return;
             }
+
+            // Create update options menu
+            var updateOptions = new List<string>();
+            updateOptions.AddRange(availableManagers);
+            updateOptions.Add("PowerShell Modules");
+            updateOptions.Add("Update All");
+            updateOptions.Add("Back");
+
+            var updateDialog = new Dialog("Update Package Managers", 60, 15)
+            {
+                ColorScheme = Colors.Dialog
+            };
+
+            var updateListView = new ListView(updateOptions)
+            {
+                X = 0,
+                Y = 0,
+                Width = Dim.Fill(),
+                Height = Dim.Fill(),
+                CanFocus = true,
+                ColorScheme = Colors.Dialog
+            };
+            updateDialog.Add(updateListView);
+
+            var dialogClosed = new TaskCompletionSource<bool>();
+            _ = Task.Run(() =>
+            {
+                Application.Run(updateDialog);
+                dialogClosed.SetResult(true);
+            });
+
+            updateListView.OpenSelectedItem += async (args) =>
+            {
+                var selected = updateOptions[args.Item];
+                switch (selected)
+                {
+                    case "winget":
+                        await RunPackageManagerUpdate("winget", () => packageManagerService.UpdateWinget());
+                        break;
+                    case "npm":
+                        await RunPackageManagerUpdate("npm", () => packageManagerService.UpdateNpm());
+                        break;
+                    case "scoop":
+                        await RunPackageManagerUpdate("scoop", () => packageManagerService.UpdateScoop());
+                        break;
+                    case "choco":
+                        await RunPackageManagerUpdate("choco", () => packageManagerService.UpdateChoco());
+                        break;
+                    case "PowerShell Modules":
+                        await RunPackageManagerUpdate("PowerShell Modules", () => packageManagerService.UpdatePowerShellModules());
+                        break;
+                    case "Update All":
+                        await RunUpdateAll(availableManagers, packageManagerService);
+                        break;
+                    case "Back":
+                        Application.MainLoop.Invoke(() => Application.RequestStop());
+                        break;
+                }
+            };
+
+            await dialogClosed.Task;
+        }
+
+        static async Task RunPackageManagerUpdate(string managerName, Func<Task> updateAction)
+        {
+            var progressDialog = new Dialog($"Updating {managerName}...", 50, 8)
+            {
+                ColorScheme = Colors.Dialog
+            };
+
+            var progressLabel = new Label($"Updating {managerName}, please wait...")
+            {
+                X = Pos.Center(),
+                Y = 1
+            };
+            progressDialog.Add(progressLabel);
+
+            var progressDialogClosed = new TaskCompletionSource<bool>();
+            _ = Task.Run(() =>
+            {
+                Application.Run(progressDialog);
+                progressDialogClosed.SetResult(true);
+            });
+
+            try
+            {
+                await updateAction();
+                Application.MainLoop.Invoke(() =>
+                {
+                    MessageBox.Query("Success", $"{managerName} update completed successfully!", "Ok");
+                    Application.RequestStop(); // Close progress dialog
+                });
+            }
+            catch (Exception ex)
+            {
+                Application.MainLoop.Invoke(() =>
+                {
+                    MessageBox.ErrorQuery("Error", $"Failed to update {managerName}: {ex.Message}", "Ok");
+                    Application.RequestStop(); // Close progress dialog
+                });
+            }
+
+            await progressDialogClosed.Task;
+        }
+
+        static async Task RunUpdateAll(List<string> availableManagers, PackageManagerService packageManagerService)
+        {
+            var progressDialog = new Dialog("Updating All Package Managers...", 60, 10)
+            {
+                ColorScheme = Colors.Dialog
+            };
+
+            var progressLabel = new Label("Updating all package managers, please wait...")
+            {
+                X = Pos.Center(),
+                Y = 1
+            };
+            progressDialog.Add(progressLabel);
+
+            var statusLabel = new Label("")
+            {
+                X = Pos.Center(),
+                Y = 3
+            };
+            progressDialog.Add(statusLabel);
+
+            var progressDialogClosed = new TaskCompletionSource<bool>();
+            _ = Task.Run(() =>
+            {
+                Application.Run(progressDialog);
+                progressDialogClosed.SetResult(true);
+            });
+
+            var results = new List<string>();
+            var errors = new List<string>();
+
+            try
+            {
+                // Update each package manager
+                foreach (var manager in availableManagers)
+                {
+                    Application.MainLoop.Invoke(() =>
+                    {
+                        statusLabel.Text = $"Updating {manager}...";
+                    });
+
+                    try
+                    {
+                        switch (manager)
+                        {
+                            case "winget":
+                                await packageManagerService.UpdateWinget();
+                                break;
+                            case "npm":
+                                await packageManagerService.UpdateNpm();
+                                break;
+                            case "scoop":
+                                await packageManagerService.UpdateScoop();
+                                break;
+                            case "choco":
+                                await packageManagerService.UpdateChoco();
+                                break;
+                        }
+                        results.Add($"{manager}: Success");
+                    }
+                    catch (Exception ex)
+                    {
+                        errors.Add($"{manager}: Failed - {ex.Message}");
+                    }
+                }
+
+                // Update PowerShell modules
+                Application.MainLoop.Invoke(() =>
+                {
+                    statusLabel.Text = "Updating PowerShell modules...";
+                });
+
+                try
+                {
+                    await packageManagerService.UpdatePowerShellModules();
+                    results.Add("PowerShell Modules: Success");
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"PowerShell Modules: Failed - {ex.Message}");
+                }
+
+                Application.MainLoop.Invoke(() =>
+                {
+                    var message = "Update Results:\n\n";
+                    if (results.Count > 0)
+                    {
+                        message += "Successful:\n" + string.Join("\n", results) + "\n\n";
+                    }
+                    if (errors.Count > 0)
+                    {
+                        message += "Failed:\n" + string.Join("\n", errors);
+                    }
+
+                    MessageBox.Query("Update Complete", message, "Ok");
+                    Application.RequestStop(); // Close progress dialog
+                });
+            }
+            catch (Exception ex)
+            {
+                Application.MainLoop.Invoke(() =>
+                {
+                    MessageBox.ErrorQuery("Error", $"Update process failed: {ex.Message}", "Ok");
+                    Application.RequestStop(); // Close progress dialog
+                });
+            }
+
+            await progressDialogClosed.Task;
         }
 
         static async Task ShowCacheSubmenu()

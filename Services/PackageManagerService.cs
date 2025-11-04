@@ -20,7 +20,7 @@ namespace InvolveX.Cli.Services
         public async Task<bool> IsChocoInstalled() => await IsCommandInstalled("choco");
 
         public async Task UpdateWinget() => await RunUpdateCommand("winget", "update --include-unknown");
-        public async Task UpdateNpm() => await RunUpdateCommand("npm", "outdated -g");
+        public async Task UpdateNpm() => await RunUpdateCommand("npm", "update -g");
         public async Task UpdateScoop() => await RunUpdateCommand("scoop", "update");
         public async Task UpdateChoco() => await RunUpdateCommand("choco", "upgrade all -y");
 
