@@ -1158,16 +1158,17 @@ namespace InvolveX.Cli
 
                         CancellationTokenSource? speedTestCts = new CancellationTokenSource();
                         bool speedTestCompleted = false;
+                        string? speedTestResult = null;
+                        Exception? speedTestException = null;
 
                         cancelSpeedTestButton.Clicked += () =>
                         {
                             speedTestCts?.Cancel();
-                            Application.RequestStop();
                         };
 
                         speedTestDialog.AddButton(cancelSpeedTestButton);
 
-                        // Run speed test asynchronously with timeout
+                        // Run speed test asynchronously
                         var speedTestTask = Task.Run(async () =>
                         {
                             try
@@ -1178,36 +1179,46 @@ namespace InvolveX.Cli
                                 });
 
                                 var result = await networkService.RunSpeedTest();
+                                speedTestResult = result;
                                 speedTestCompleted = true;
-
-                                Application.MainLoop.Invoke(() =>
-                                {
-                                    MessageBox.Query("Speed Test Result", result, "Ok");
-                                    Application.RequestStop(); // Close progress dialog
-                                });
                             }
                             catch (Exception ex)
                             {
-                                Application.MainLoop.Invoke(() =>
-                                {
-                                    MessageBox.ErrorQuery("Speed Test Error", $"Speed test failed: {ex.Message}", "Ok");
-                                    Application.RequestStop(); // Close progress dialog
-                                });
+                                speedTestException = ex;
                             }
                         }, speedTestCts.Token);
 
-                        // Add timeout
-                        var timeoutTask = Task.Delay(60000, speedTestCts.Token); // 60 second timeout
-                        var completedTask = Task.WhenAny(speedTestTask, timeoutTask).Result;
+                        // Show dialog and wait for completion or cancellation
+                        Application.Run(speedTestDialog);
 
-                        if (completedTask == timeoutTask && !speedTestCompleted)
+                        // Check if user cancelled
+                        if (speedTestCts.IsCancellationRequested)
                         {
                             speedTestCts?.Cancel();
-                            MessageBox.ErrorQuery("Timeout", "Speed test timed out after 60 seconds.", "Ok");
+                            MessageBox.Query("Cancelled", "Speed test was cancelled.", "Ok");
                         }
                         else
                         {
-                            Application.Run(speedTestDialog);
+                            // Wait for the task with a reasonable timeout
+                            var completed = speedTestTask.Wait(65000); // 65 second timeout
+
+                            if (!completed)
+                            {
+                                speedTestCts?.Cancel();
+                                MessageBox.ErrorQuery("Timeout", "Speed test timed out after 60 seconds.", "Ok");
+                            }
+                            else if (speedTestException != null)
+                            {
+                                MessageBox.ErrorQuery("Speed Test Error", $"Speed test failed: {speedTestException.Message}", "Ok");
+                            }
+                            else if (speedTestCompleted && speedTestResult != null)
+                            {
+                                MessageBox.Query("Speed Test Result", speedTestResult, "Ok");
+                            }
+                            else
+                            {
+                                MessageBox.ErrorQuery("Error", "Speed test completed but no result was returned.", "Ok");
+                            }
                         }
 
                         speedTestCts?.Dispose();
