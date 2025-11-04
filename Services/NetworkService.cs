@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace InvolveX.Cli.Services
@@ -13,7 +14,7 @@ namespace InvolveX.Cli.Services
             _logService = logService;
         }
 
-        public async Task<string> RunPingTest(string host)
+        public async Task<string> RunPingTest(string host, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -40,9 +41,37 @@ namespace InvolveX.Cli.Services
                 };
 
                 process.Start();
-                string stdout = await process.StandardOutput.ReadToEndAsync();
-                string stderr = await process.StandardError.ReadToEndAsync();
-                await process.WaitForExitAsync();
+
+                // Create tasks for reading output and waiting for exit
+                var outputTask = process.StandardOutput.ReadToEndAsync();
+                var errorTask = process.StandardError.ReadToEndAsync();
+                var exitTask = process.WaitForExitAsync();
+
+                // Wait for all tasks with cancellation support
+                var completedTask = await Task.WhenAny(
+                    Task.WhenAll(outputTask, errorTask, exitTask),
+                    Task.Delay(Timeout.Infinite, cancellationToken)
+                );
+
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        if (!process.HasExited)
+                        {
+                            process.Kill();
+                            _logService.Log("Ping test cancelled by user");
+                            return "Ping test cancelled by user.";
+                        }
+                    }
+                    catch (Exception killEx)
+                    {
+                        _logService.Log($"Error killing ping process: {killEx.Message}");
+                    }
+                }
+
+                string stdout = await outputTask;
+                string stderr = await errorTask;
 
                 _logService.Log($"[ping STDOUT]: {stdout}");
                 _logService.Log($"[ping STDERR]: {stderr}");
@@ -53,6 +82,11 @@ namespace InvolveX.Cli.Services
                 }
 
                 return stdout;
+            }
+            catch (OperationCanceledException)
+            {
+                _logService.Log("Ping test was cancelled");
+                return "Ping test cancelled.";
             }
             catch (Exception ex)
             {

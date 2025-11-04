@@ -922,36 +922,59 @@ namespace InvolveX.Cli
                             Width = 30
                         };
 
-                        var pingDialog = new Dialog("Run Ping Test", 50, 10)
+                        var pingDialog = new Dialog("Run Ping Test", 50, 12)
                         {
                             ColorScheme = Colors.Dialog
                         };
 
                         pingDialog.Add(new Label("Enter host to ping:") { X = Pos.Center(), Y = 1 });
                         pingDialog.Add(hostInput);
+                        pingDialog.Add(new Label("Press Ctrl+C to cancel ping") { X = Pos.Center(), Y = 5 });
 
                         var pingButton = new Button("Ping")
                         {
                             X = Pos.Center() - 8,
-                            Y = 5,
+                            Y = 7,
                             IsDefault = true
                         };
 
                         var cancelPingButton = new Button("Cancel")
                         {
                             X = Pos.Center() + 4,
-                            Y = 5
+                            Y = 7
                         };
 
-                        pingButton.Clicked += () =>
+                        CancellationTokenSource? cts = null;
+
+                        pingButton.Clicked += async () =>
                         {
                             var host = hostInput.Text.ToString();
                             if (!string.IsNullOrEmpty(host))
                             {
-                                var task = networkService.RunPingTest(host);
-                                task.Wait(); // Wait for completion
-                                MessageBox.Query("Ping Test Result", task.Result, "Ok");
-                                // Don't call Application.RequestStop() here - let user continue using the dialog
+                                // Disable buttons during ping
+                                pingButton.Enabled = false;
+                                cancelPingButton.Enabled = false;
+
+                                cts = new CancellationTokenSource();
+
+                                try
+                                {
+                                    var task = networkService.RunPingTest(host, cts.Token);
+                                    var result = await task;
+                                    MessageBox.Query("Ping Test Result", result, "Ok");
+                                }
+                                catch (Exception ex)
+                                {
+                                    MessageBox.ErrorQuery("Error", $"Ping failed: {ex.Message}", "Ok");
+                                }
+                                finally
+                                {
+                                    // Re-enable buttons
+                                    pingButton.Enabled = true;
+                                    cancelPingButton.Enabled = true;
+                                    cts?.Dispose();
+                                    cts = null;
+                                }
                             }
                             else
                             {
@@ -959,12 +982,27 @@ namespace InvolveX.Cli
                             }
                         };
 
-                        cancelPingButton.Clicked += () => Application.RequestStop();
+                        cancelPingButton.Clicked += () =>
+                        {
+                            cts?.Cancel();
+                            Application.RequestStop();
+                        };
+
+                        // Handle Ctrl+C for cancellation
+                        pingDialog.KeyDown += (e) =>
+                        {
+                            if (e.KeyEvent.Key == (Key.C | Key.CtrlMask))
+                            {
+                                cts?.Cancel();
+                                e.Handled = true;
+                            }
+                        };
 
                         pingDialog.AddButton(pingButton);
                         pingDialog.AddButton(cancelPingButton);
 
                         Application.Run(pingDialog);
+                        cts?.Dispose();
                         break;
                     case "Run Speed Test":
                         var resultTask = networkService.RunSpeedTest();
