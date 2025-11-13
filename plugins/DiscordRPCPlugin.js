@@ -6,6 +6,8 @@ try {
   // Package not installed, will handle gracefully
 }
 
+const blessed = require('blessed'); // Add this line
+
 class DiscordRPCPlugin {
   constructor() {
     this.name = 'DiscordRPC';
@@ -154,9 +156,41 @@ class DiscordRPCPlugin {
   }
 
   // Method to be called by the CLI
-  async execute(_screen) {
+  async execute(screen) {
     // Execution handled through settings; nothing to render directly
-    return true;
+    // Instead, show a message to the user
+    const messageDialog = blessed.box({
+      top: 'center',
+      left: 'center',
+      width: '50%',
+      height: '20%',
+      border: {
+        type: 'line',
+      },
+      label: ' {green-fg}Discord RPC{/green-fg} ',
+      content:
+        '\nDiscord Rich Presence is managed via the Settings menu.\n\nPress any key to continue...',
+      style: {
+        bg: 'black',
+        fg: 'green',
+        border: {
+          fg: 'green',
+        },
+      },
+      keys: true,
+    });
+
+    screen.append(messageDialog);
+    screen.render();
+
+    return new Promise(resolve => {
+      messageDialog.key(['enter', 'escape', 'q', 'space'], () => {
+        messageDialog.destroy();
+        screen.render();
+        resolve(true);
+      });
+      messageDialog.focus();
+    });
   }
 }
 
