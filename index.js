@@ -3559,7 +3559,9 @@ async function main() {
   // Temporarily suppress output during parsing if not explicitly requesting help
   // But don't suppress if serve is being used (we want to see server messages)
   // Also don't suppress if no arguments (we want to see TUI startup)
-  const hasNoArgs = process.argv.length === 2; // Only 'node' and 'index.js'
+  // Check if we have only the script name (could be 'node index.js' or just 'index.js')
+  const scriptArgs = process.argv.slice(2); // Get args after 'node' and script path
+  const hasNoArgs = scriptArgs.length === 0;
   if (
     !process.argv.includes('--help') &&
     !process.argv.includes('-h') &&

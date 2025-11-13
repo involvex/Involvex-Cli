@@ -13,6 +13,8 @@ class WebServer {
     // Serve static files if folder is provided
     this.app.use(express.json());
     this.app.use(express.static('public'));
+    // Serve favicon
+    this.app.use('/favicon.png', express.static('favicon.png'));
 
     // Main API routes
     this.app.get('/', (req, res) => {
@@ -198,7 +200,7 @@ class WebServer {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>InvolveX CLI - Web Interface</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/png" href="/favicon.png">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; }
