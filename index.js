@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Version constant
-const VERSION = '1.0.2';
+const VERSION = '1.0.4';
 
 const blessed = require('blessed');
 const { Command } = require('commander');
