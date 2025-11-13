@@ -23,6 +23,7 @@ const PluginService = require('./services/PluginService');
 const PluginRepositoryService = require('./services/PluginRepositoryService');
 const SettingsService = require('./services/SettingsService');
 const AutoUpdateService = require('./services/AutoUpdateService');
+const WebServer = require('./server/webServer');
 
 // Initialize services
 const logService = new LogService();
@@ -312,6 +313,10 @@ OPTIONS:
     --driver                  Check for driver updates
     --restore                 List system restore points
     --plugins                 List installed plugins (legacy, use 'plugin list')
+    --serve                   Start web server interface
+    --port <port>             Port for web server (default: 3000)
+    --host <host>             Host for web server (default: 0.0.0.0)
+    --path <path>             Path to serve static files (optional)
 
 DESCRIPTION:
     InvolveX CLI is a comprehensive Windows system administration toolkit
@@ -352,6 +357,9 @@ EXAMPLES:
     involvex-cli --update          # Check for updates
     involvex-cli --cache           # Clear caches
     involvex-cli plugin list       # List plugins
+    involvex-cli --serve           # Start web server on port 3000
+    involvex-cli --serve --port 8080 --host 0.0.0.0  # Custom port and host
+    involvex-cli --serve --path ./public  # Serve folder and CLI interface
 
 SYSTEM REQUIREMENTS:
     • Windows 10/11
@@ -3502,12 +3510,20 @@ async function main() {
     .option('--network', 'Run network tests')
     .option('--driver', 'Check for driver updates')
     .option('--restore', 'List system restore points')
-    .option('--plugins', 'List installed plugins (use "plugin list" instead)');
+    .option('--plugins', 'List installed plugins (use "plugin list" instead)')
+    .option('--serve', 'Start web server interface')
+    .option('--port <port>', 'Port for web server (default: 3000)', '3000')
+    .option('--host <host>', 'Host for web server (default: 0.0.0.0)', '0.0.0.0')
+    .option('--path <path>', 'Path to serve static files (optional)');
 
   // Parse arguments
-  program.parse();
+  program.parse(process.argv);
 
   const options = program.opts();
+
+  // Check if any command or option was provided
+  const hasOptions = Object.keys(options).length > 0;
+  const hasCommand = program.args.length > 0 && program.args[0] !== 'help';
 
   // Handle command line arguments
   if (options.help) {
@@ -3668,8 +3684,104 @@ async function main() {
     return;
   }
 
-  // Check if terminal is interactive
-  // Allow Windows and force interactive flag
+  if (options.serve) {
+    await initializeConfig();
+    const port = parseInt(options.port || '3000', 10);
+    const host = options.host || '0.0.0.0';
+
+    const webServer = new WebServer(logService, {
+      packageManager: packageManagerService,
+      cache: cacheService,
+      startup: startupService,
+      uninstaller: uninstallerService,
+      dns: dnsService,
+      network: networkService,
+      plugin: pluginService,
+    });
+
+    // Serve folder if path provided
+    if (options.path) {
+      const fs = require('fs');
+      const path = require('path');
+      const folderPath = path.resolve(options.path);
+      try {
+        const stats = await fs.promises.stat(folderPath);
+        if (stats.isDirectory()) {
+          webServer.serveFolder(folderPath);
+          console.log(`Serving folder: ${folderPath}`);
+        } else {
+          console.error(`Error: ${folderPath} is not a directory`);
+          process.exit(1);
+        }
+      } catch (error) {
+        console.error(`Error accessing folder: ${error.message}`);
+        process.exit(1);
+      }
+    }
+
+    try {
+      await webServer.start(port, host);
+      console.log(`\n🌐 Web server running at http://${host}:${port}`);
+      console.log('Press Ctrl+C to stop the server\n');
+
+      // Handle graceful shutdown
+      process.on('SIGINT', async () => {
+        console.log('\nShutting down web server...');
+        await webServer.stop();
+        process.exit(0);
+      });
+
+      process.on('SIGTERM', async () => {
+        await webServer.stop();
+        process.exit(0);
+      });
+    } catch (error) {
+      console.error(`Failed to start web server: ${error.message}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // If no options or commands provided, start interactive TUI
+  if (!hasOptions && !hasCommand) {
+    // Check if terminal is interactive
+    const forceInteractive =
+      process.env.FORCE_INTERACTIVE === 'true' ||
+      process.env.VSCODE_PID ||
+      process.platform === 'win32';
+
+    if (!forceInteractive && !isInteractiveTerminal()) {
+      showNonInteractiveError();
+      return;
+    }
+
+    // Initialize and start TUI
+    await initializeConfig();
+
+    // Check for updates (only in interactive mode)
+    try {
+      const updateInfo = await checkForUpdates();
+      if (updateInfo.hasUpdate) {
+        console.log(
+          `\n📦 Update available: ${updateInfo.currentVersion} → ${updateInfo.latestVersion}`
+        );
+        console.log(`Run 'npm install -g @involvex/involvex-cli@latest' to update.\n`);
+      }
+    } catch {
+      // Silently ignore update check errors
+    }
+
+    // Start TUI
+    try {
+      await startTUI();
+    } catch (error) {
+      console.error(`Failed to start TUI: ${error.message}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // Check if terminal is interactive for command execution
   const forceInteractive =
     process.env.FORCE_INTERACTIVE === 'true' ||
     process.env.VSCODE_PID ||
@@ -3678,7 +3790,7 @@ async function main() {
   if (!forceInteractive && !isInteractiveTerminal()) {
     // Don't show error if we're in a command context (plugin commands, etc.)
     // Only show error if no commands were executed
-    const hasCommand =
+    const hasExecutableCommand =
       options.update ||
       options.cache ||
       options.startup ||
@@ -3687,37 +3799,18 @@ async function main() {
       options.network ||
       options.driver ||
       options.restore ||
-      options.plugins;
+      options.plugins ||
+      options.serve ||
+      hasCommand;
 
-    if (!hasCommand) {
+    if (!hasExecutableCommand) {
       showNonInteractiveError();
       return;
     }
   }
 
-  // Initialize configuration
+  // Initialize configuration for command execution
   await initializeConfig();
-
-  // Check for updates (only in interactive mode)
-  try {
-    const updateInfo = await checkForUpdates();
-    if (updateInfo.hasUpdate) {
-      console.log(
-        `\n📦 Update available: ${updateInfo.currentVersion} → ${updateInfo.latestVersion}`
-      );
-      console.log(`Run 'npm install -g @involvex/involvex-cli@latest' to update.\n`);
-    }
-  } catch {
-    // Silently ignore update check errors
-  }
-
-  // Start TUI
-  try {
-    await startTUI();
-  } catch (error) {
-    console.error(`Failed to start TUI: ${error.message}`);
-    process.exit(1);
-  }
 }
 
 // Run the application
