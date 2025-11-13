@@ -2113,7 +2113,7 @@ async function showPluginsMenu(screen) {
           const pluginNames = plugins.map(
             p => `${p.name || 'Unknown'} - ${p.description || 'No description'}`
           );
-          showListDialog(screen, 'Installed Plugins', pluginNames);
+          await showListDialog(screen, 'Installed Plugins', pluginNames);
           break;
         }
         case 'Browse Plugin Repository': {
@@ -2144,24 +2144,14 @@ async function showPluginsMenu(screen) {
           await showServiceManager(screen);
           break;
         }
+        case 'Back': {
+          pluginsDialog.destroy();
+          screen.render();
+          break;
+        }
       }
     } catch (error) {
       showMessage(screen, 'Error', `Plugin operation failed: ${error.message}`);
-    }
-
-    if (
-      ![
-        'Browse Plugin Repository',
-        'Install Plugin',
-        'Uninstall Plugin',
-        'Execute Plugin',
-        'System Monitor',
-        'Process Manager',
-        'Service Manager',
-      ].includes(selected)
-    ) {
-      pluginsDialog.destroy();
-      screen.render();
     }
   });
 
