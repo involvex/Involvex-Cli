@@ -3571,14 +3571,13 @@ async function main() {
   } catch {
     // Ignore parse errors, we'll handle them ourselves
   } finally {
-    // Restore process.exit after parsing, but only if not serving
-    if (!process.argv.includes('--serve')) {
-      process.exit = originalExit;
-    }
+    // Restore stdout/stderr after parsing
     if (suppressOutput) {
       process.stdout.write = originalWrite;
       process.stderr.write = originalErrWrite;
     }
+    // Note: We keep process.exit override for serve to prevent premature exit
+    // It will be restored in the serve handler after server starts
   }
 
   const options = program.opts();
@@ -3648,6 +3647,10 @@ async function main() {
 
       process.on('SIGINT', shutdown);
       process.on('SIGTERM', shutdown);
+
+      // Restore original process.exit now that server is running
+      // The Express server will keep the event loop alive
+      process.exit = originalExit;
 
       // The Express server keeps the event loop alive, so the process won't exit
       // We return here to prevent further execution, but the server will keep running
@@ -3871,6 +3874,13 @@ async function main() {
       showNonInteractiveError();
       return;
     }
+  }
+
+  // If we reach here and serve was requested, something went wrong
+  // (serve handler should have returned earlier)
+  if (options.serve) {
+    console.error('Web server failed to start properly');
+    process.exit(1);
   }
 
   // Initialize configuration for command execution
