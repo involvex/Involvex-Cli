@@ -1,6 +1,6 @@
 {
   "name": "@involvex/involvex-cli",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "Windows System Administration Toolkit - JavaScript Edition",
   "main": "index.js",
   "bin": {
