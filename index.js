@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-// Version constant
-const VERSION = '1.0.11';
+// Import version from package.json
+const packageJson = require('./package.json');
+const VERSION = packageJson.version;
 
 const blessed = require('blessed');
 const { Command } = require('commander');
@@ -3560,13 +3561,18 @@ async function main() {
   // But don't suppress if serve is being used (we want to see server messages)
   // Also don't suppress if no arguments (we want to see TUI startup)
   // Check if we have only the script name (could be 'node index.js' or just 'index.js')
+  // When npm start runs, process.argv[1] is the script path, so we check args after that
   const scriptArgs = process.argv.slice(2); // Get args after 'node' and script path
   const hasNoArgs = scriptArgs.length === 0;
+  const isNpmStart =
+    process.env.npm_lifecycle_event === 'start' || process.env.npm_command === 'start';
+
   if (
     !process.argv.includes('--help') &&
     !process.argv.includes('-h') &&
     !process.argv.includes('--serve') &&
-    !hasNoArgs
+    !hasNoArgs &&
+    !isNpmStart
   ) {
     suppressOutput = true;
     process.stdout.write = () => true;
