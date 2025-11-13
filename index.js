@@ -3397,7 +3397,25 @@ async function main() {
   program
     .name('involvex-cli')
     .description('Windows System Administration Toolkit')
-    .version(VERSION);
+    .version(VERSION)
+    .allowUnknownOption(false)
+    .allowExcessArguments(false)
+    .configureHelp({
+      helpWidth: 120,
+    });
+
+  // Prevent commander from showing help automatically
+  program.exitOverride();
+
+  // Suppress help output when we don't want it
+  const originalHelp = program.helpInformation;
+  program.helpInformation = function () {
+    // Only show help if explicitly requested
+    if (process.argv.includes('--help') || process.argv.includes('-h')) {
+      return originalHelp.call(this);
+    }
+    return '';
+  };
 
   // Plugin management commands
   program
@@ -3516,8 +3534,38 @@ async function main() {
     .option('--host <host>', 'Host for web server (default: 0.0.0.0)', '0.0.0.0')
     .option('--path <path>', 'Path to serve static files (optional)');
 
-  // Parse arguments
-  program.parse(process.argv);
+  // Parse arguments - suppress help output and catch exit
+  const originalExit = process.exit;
+  const originalWrite = process.stdout.write;
+  const originalErrWrite = process.stderr.write;
+  let suppressOutput = false;
+
+  process.exit = code => {
+    if (code === 0 && !process.argv.includes('--help') && !process.argv.includes('-h')) {
+      // Commander wants to exit, but we'll handle it ourselves
+      return;
+    }
+    originalExit(code);
+  };
+
+  // Temporarily suppress output during parsing if not explicitly requesting help
+  if (!process.argv.includes('--help') && !process.argv.includes('-h')) {
+    suppressOutput = true;
+    process.stdout.write = () => true;
+    process.stderr.write = () => true;
+  }
+
+  try {
+    program.parse(process.argv);
+  } catch {
+    // Ignore parse errors, we'll handle them ourselves
+  } finally {
+    process.exit = originalExit;
+    if (suppressOutput) {
+      process.stdout.write = originalWrite;
+      process.stderr.write = originalErrWrite;
+    }
+  }
 
   const options = program.opts();
 
@@ -3533,6 +3581,65 @@ async function main() {
 
   if (options.version) {
     showVersion();
+    return;
+  }
+
+  // Check for serve option early (before other option handlers)
+  if (options.serve) {
+    await initializeConfig();
+    const port = parseInt(options.port || '3000', 10);
+    const host = options.host || '0.0.0.0';
+
+    const webServer = new WebServer(logService, {
+      packageManager: packageManagerService,
+      cache: cacheService,
+      startup: startupService,
+      uninstaller: uninstallerService,
+      dns: dnsService,
+      network: networkService,
+      plugin: pluginService,
+    });
+
+    // Serve folder if path provided
+    if (options.path) {
+      const fs = require('fs');
+      const path = require('path');
+      const folderPath = path.resolve(options.path);
+      try {
+        const stats = await fs.promises.stat(folderPath);
+        if (stats.isDirectory()) {
+          webServer.serveFolder(folderPath);
+          console.log(`Serving folder: ${folderPath}`);
+        } else {
+          console.error(`Error: ${folderPath} is not a directory`);
+          process.exit(1);
+        }
+      } catch (error) {
+        console.error(`Error accessing folder: ${error.message}`);
+        process.exit(1);
+      }
+    }
+
+    try {
+      await webServer.start(port, host);
+      console.log(`\n🌐 Web server running at http://${host}:${port}`);
+      console.log('Press Ctrl+C to stop the server\n');
+
+      // Handle graceful shutdown
+      process.on('SIGINT', async () => {
+        console.log('\nShutting down web server...');
+        await webServer.stop();
+        process.exit(0);
+      });
+
+      process.on('SIGTERM', async () => {
+        await webServer.stop();
+        process.exit(0);
+      });
+    } catch (error) {
+      console.error(`Failed to start web server: ${error.message}`);
+      process.exit(1);
+    }
     return;
   }
 
@@ -3680,64 +3787,6 @@ async function main() {
       }
     } catch (error) {
       console.error(`Failed to list plugins: ${error.message}`);
-    }
-    return;
-  }
-
-  if (options.serve) {
-    await initializeConfig();
-    const port = parseInt(options.port || '3000', 10);
-    const host = options.host || '0.0.0.0';
-
-    const webServer = new WebServer(logService, {
-      packageManager: packageManagerService,
-      cache: cacheService,
-      startup: startupService,
-      uninstaller: uninstallerService,
-      dns: dnsService,
-      network: networkService,
-      plugin: pluginService,
-    });
-
-    // Serve folder if path provided
-    if (options.path) {
-      const fs = require('fs');
-      const path = require('path');
-      const folderPath = path.resolve(options.path);
-      try {
-        const stats = await fs.promises.stat(folderPath);
-        if (stats.isDirectory()) {
-          webServer.serveFolder(folderPath);
-          console.log(`Serving folder: ${folderPath}`);
-        } else {
-          console.error(`Error: ${folderPath} is not a directory`);
-          process.exit(1);
-        }
-      } catch (error) {
-        console.error(`Error accessing folder: ${error.message}`);
-        process.exit(1);
-      }
-    }
-
-    try {
-      await webServer.start(port, host);
-      console.log(`\n🌐 Web server running at http://${host}:${port}`);
-      console.log('Press Ctrl+C to stop the server\n');
-
-      // Handle graceful shutdown
-      process.on('SIGINT', async () => {
-        console.log('\nShutting down web server...');
-        await webServer.stop();
-        process.exit(0);
-      });
-
-      process.on('SIGTERM', async () => {
-        await webServer.stop();
-        process.exit(0);
-      });
-    } catch (error) {
-      console.error(`Failed to start web server: ${error.message}`);
-      process.exit(1);
     }
     return;
   }
