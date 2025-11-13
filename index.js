@@ -3605,10 +3605,6 @@ async function main() {
   const hasOptions = filteredOptions.length > 0;
   const hasCommand = program.args.length > 0 && program.args[0] !== 'help';
 
-  // Force interactive mode if npm start is detected
-  const isNpmStart =
-    process.env.npm_lifecycle_event === 'start' || process.env.npm_command === 'start';
-
   // Handle command line arguments
   if (options.help) {
     showHelp();
