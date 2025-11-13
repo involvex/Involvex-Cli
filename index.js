@@ -3391,8 +3391,39 @@ function showHelpDialog(screen) {
 }
 
 // Main function
+
 async function main() {
-  // Set up command line interface
+  // Handle interactive mode explicitly before parsing other options
+  if (process.argv.includes('--interactive') || process.argv.length <= 2) {
+    if (!isInteractiveTerminal()) {
+      showNonInteractiveError();
+      return;
+    }
+
+    await initializeConfig();
+
+    try {
+      const updateInfo = await checkForUpdates();
+      if (updateInfo.hasUpdate) {
+        console.log(
+          `\n📦 Update available: ${updateInfo.currentVersion} → ${updateInfo.latestVersion}`
+        );
+        console.log(`Run 'npm install -g @involvex/involvex-cli@latest' to update.\n`);
+      }
+    } catch {
+      // Silently ignore update check errors
+    }
+
+    try {
+      await startTUI();
+    } catch (error) {
+      console.error(`Failed to start TUI: ${error.message}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // Set up command line interface for non-interactive commands
   const program = new Command();
 
   program
@@ -3405,19 +3436,6 @@ async function main() {
       helpWidth: 120,
     });
 
-  // Prevent commander from showing help automatically
-  program.exitOverride();
-
-  // Suppress help output when we don't want it
-  const originalHelp = program.helpInformation;
-  program.helpInformation = function () {
-    // Only show help if explicitly requested
-    if (process.argv.includes('--help') || process.argv.includes('-h')) {
-      return originalHelp.call(this);
-    }
-    return '';
-  };
-
   // Plugin management commands
   program
     .command('plugin')
@@ -3429,7 +3447,6 @@ async function main() {
       await initializeConfig();
 
       if (!action || action === 'list') {
-        // List plugins
         try {
           const plugins = pluginService.getLoadedPlugins();
           if (plugins.length === 0) {
@@ -3438,7 +3455,9 @@ async function main() {
             console.log('Installed Plugins:');
             plugins.forEach(plugin => {
               console.log(
-                `  ${plugin.name || 'Unknown'} v${plugin.version || '1.0.0'} - ${plugin.description || 'No description'}`
+                `  ${plugin.name || 'Unknown'} v${plugin.version || '1.0.0'} - ${
+                  plugin.description || 'No description'
+                }`
               );
             });
           }
@@ -3447,7 +3466,6 @@ async function main() {
           process.exit(1);
         }
       } else if (action === 'install') {
-        // Install plugin
         if (!options.path && !name) {
           console.error(
             'Error: Plugin path required. Use --path <path> or provide plugin file path.'
@@ -3469,7 +3487,6 @@ async function main() {
           process.exit(1);
         }
       } else if (action === 'uninstall') {
-        // Uninstall plugin
         if (!name) {
           console.error('Error: Plugin name required.');
           process.exit(1);
@@ -3488,14 +3505,12 @@ async function main() {
           process.exit(1);
         }
       } else if (action === 'update') {
-        // Update plugin
         if (!name) {
           console.error('Error: Plugin name required.');
           process.exit(1);
         }
         try {
           console.log(`Updating plugin: ${name}`);
-          // First uninstall, then reinstall if path provided
           const uninstalled = await pluginService.uninstallPluginAsync(name);
           if (uninstalled && options.path) {
             const installed = await pluginService.installPluginAsync(options.path);
@@ -3519,7 +3534,7 @@ async function main() {
       }
     });
 
-  // Legacy options for backward compatibility
+  // Options for direct command execution
   program
     .option('--update', 'Update package managers and packages')
     .option('--cache', 'Clear system and memory caches')
@@ -3535,282 +3550,90 @@ async function main() {
     .option('--host <host>', 'Host for web server (default: 0.0.0.0)', '0.0.0.0')
     .option('--path <path>', 'Path to serve static files (optional)');
 
-  // Parse arguments - suppress help output and catch exit
-  const originalExit = process.exit;
-  const originalWrite = process.stdout.write;
-  const originalErrWrite = process.stderr.write;
-  let suppressOutput = false;
-
-  process.exit = code => {
-    // Don't prevent exit if serve is running or help is explicitly requested
-    // Also allow exit if no arguments provided (we'll start interactive mode)
-    if (
-      code === 0 &&
-      !process.argv.includes('--help') &&
-      !process.argv.includes('-h') &&
-      !process.argv.includes('--serve')
-    ) {
-      // Commander wants to exit, but we'll handle it ourselves
-      // This allows us to start interactive mode when no args provided
-      return;
-    }
-    originalExit(code);
-  };
-
-  // Temporarily suppress output during parsing if not explicitly requesting help
-  // But don't suppress if serve is being used (we want to see server messages)
-  // Also don't suppress if no arguments (we want to see TUI startup)
-  // Check if we have only the script name (could be 'node index.js' or just 'index.js')
-  // When npm start runs, process.argv[1] is the script path, so we check args after that
-  const scriptArgs = process.argv.slice(2); // Get args after 'node' and script path
-  const hasNoArgs = scriptArgs.length === 0;
-  const isNpmStart =
-    process.env.npm_lifecycle_event === 'start' || process.env.npm_command === 'start';
-
-  if (
-    !process.argv.includes('--help') &&
-    !process.argv.includes('-h') &&
-    !process.argv.includes('--serve') &&
-    !hasNoArgs &&
-    !isNpmStart
-  ) {
-    suppressOutput = true;
-    process.stdout.write = () => true;
-    process.stderr.write = () => true;
-  }
-
-  try {
-    program.parse(process.argv);
-  } catch {
-    // Ignore parse errors, we'll handle them ourselves
-  } finally {
-    // Restore stdout/stderr after parsing
-    if (suppressOutput) {
-      process.stdout.write = originalWrite;
-      process.stderr.write = originalErrWrite;
-    }
-    // Note: We keep process.exit override for serve and interactive mode
-    // It will be restored in the respective handlers after they start
-  }
-
+  program.parse(process.argv);
   const options = program.opts();
 
-  // Check if any command or option was provided
-  // Filter out default/empty options that commander might set
-  const filteredOptions = Object.keys(options).filter(key => {
-    const value = options[key];
-    // Exclude undefined, null, empty strings, and false boolean flags
-    return value !== undefined && value !== null && value !== '' && value !== false;
-  });
-  const hasOptions = filteredOptions.length > 0;
-  const hasCommand = program.args.length > 0 && program.args[0] !== 'help';
-
-  // Handle command line arguments
-  if (options.help) {
-    showHelp();
-    return;
-  }
-
-  if (options.version) {
-    showVersion();
-    return;
-  }
-
-  // Check for serve option early (before other option handlers)
-  if (options.serve) {
+  // Since interactive mode is handled above, we just handle the other flags here.
+  if (Object.keys(options).length > 0) {
     await initializeConfig();
-    const port = parseInt(options.port || '3000', 10);
-    const host = options.host || '0.0.0.0';
 
-    const webServer = new WebServer(logService, {
-      packageManager: packageManagerService,
-      cache: cacheService,
-      startup: startupService,
-      uninstaller: uninstallerService,
-      dns: dnsService,
-      network: networkService,
-      plugin: pluginService,
-    });
-
-    // Serve folder if path provided
-    if (options.path) {
-      const fs = require('fs');
-      const path = require('path');
-      const folderPath = path.resolve(options.path);
-      try {
-        const stats = await fs.promises.stat(folderPath);
-        if (stats.isDirectory()) {
+    if (options.serve) {
+      const port = parseInt(options.port, 10);
+      const host = options.host;
+      const webServer = new WebServer(logService, {
+        packageManager: packageManagerService,
+        cache: cacheService,
+        startup: startupService,
+        uninstaller: uninstallerService,
+        dns: dnsService,
+        network: networkService,
+        plugin: pluginService,
+      });
+      if (options.path) {
+        const fs = require('fs');
+        const folderPath = path.resolve(options.path);
+        if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
           webServer.serveFolder(folderPath);
           console.log(`Serving folder: ${folderPath}`);
         } else {
           console.error(`Error: ${folderPath} is not a directory`);
           process.exit(1);
         }
-      } catch (error) {
-        console.error(`Error accessing folder: ${error.message}`);
-        process.exit(1);
       }
-    }
-
-    try {
       await webServer.start(port, host);
       console.log(`\n🌐 Web server running at http://${host}:${port}`);
       console.log('Press Ctrl+C to stop the server\n');
-
-      // Handle graceful shutdown
-      const shutdown = async () => {
-        console.log('\nShutting down web server...');
-        await webServer.stop();
-        process.exit(0);
-      };
-
-      process.on('SIGINT', shutdown);
-      process.on('SIGTERM', shutdown);
-
-      // Restore original process.exit now that server is running
-      // The Express server will keep the event loop alive
-      process.exit = originalExit;
-
-      // The Express server keeps the event loop alive, so the process won't exit
-      // We return here to prevent further execution, but the server will keep running
-      return;
-    } catch (error) {
-      console.error(`Failed to start web server: ${error.message}`);
-      process.exit(1);
-    }
-  }
-
-  // Handle direct command execution
-  if (options.update) {
-    await initializeConfig();
-    console.log('Checking for available updates...');
-    try {
+      process.on('SIGINT', () => webServer.stop().then(() => process.exit(0)));
+      process.on('SIGTERM', () => webServer.stop().then(() => process.exit(0)));
+    } else if (options.update) {
+      console.log('Checking for available updates...');
       const updates = await packageManagerService.getAvailableUpdatesAsync();
       if (updates.length === 0) {
         console.log('No updates available. All packages are up to date!');
       } else {
         console.log(`Found ${updates.length} available update(s):`);
-        updates.forEach(update => {
+        updates.forEach(update =>
           console.log(
-            `${update.packageManager.toUpperCase()}: ${update.packageName} (${update.currentVersion} → ${update.availableVersion})`
-          );
-        });
+            `${update.packageManager.toUpperCase()}: ${update.packageName} (${
+              update.currentVersion
+            } → ${update.availableVersion})`
+          )
+        );
       }
-    } catch (error) {
-      console.error(`Failed to check for updates: ${error.message}`);
-    }
-    return;
-  }
-
-  if (options.cache) {
-    await initializeConfig();
-    console.log('Clearing system caches...');
-    try {
+    } else if (options.cache) {
+      console.log('Clearing system caches...');
       const success = await cacheService.clearSystemCache();
-      if (success) {
-        console.log('System cache cleared successfully!');
-      } else {
-        console.log('Cache clearing not supported or failed.');
-      }
-    } catch (error) {
-      console.error(`Failed to clear cache: ${error.message}`);
-    }
-    return;
-  }
-
-  if (options.startup) {
-    await initializeConfig();
-    console.log('Listing startup programs...');
-    try {
+      console.log(
+        success ? 'System cache cleared successfully!' : 'Cache clearing not supported or failed.'
+      );
+    } else if (options.startup) {
+      console.log('Listing startup programs...');
       const programs = await startupService.listStartupPrograms();
-      if (programs.length === 0) {
-        console.log('No startup programs found.');
-      } else {
-        console.log('Startup Programs:');
-        programs.forEach(program => console.log(`  ${program}`));
-      }
-    } catch (error) {
-      console.error(`Failed to list startup programs: ${error.message}`);
-    }
-    return;
-  }
-
-  if (options.uninstall) {
-    await initializeConfig();
-    console.log('Listing installed programs...');
-    try {
+      programs.forEach(program => console.log(`  ${program}`));
+    } else if (options.uninstall) {
+      console.log('Listing installed programs...');
       const programs = await uninstallerService.listInstalledPrograms();
-      if (programs.length === 0) {
-        console.log('No installed programs found.');
-      } else {
-        console.log('Installed Programs:');
-        programs.forEach(program => console.log(`  ${program}`));
-      }
-    } catch (error) {
-      console.error(`Failed to list installed programs: ${error.message}`);
-    }
-    return;
-  }
-
-  if (options.dns) {
-    await initializeConfig();
-    console.log('DNS Configuration:');
-    try {
+      programs.forEach(program => console.log(`  ${program}`));
+    } else if (options.dns) {
+      console.log('DNS Configuration:');
       const dnsInfo = await dnsService.getCurrentDns();
       console.log(dnsInfo);
-    } catch (error) {
-      console.error(`Failed to get DNS configuration: ${error.message}`);
-    }
-    return;
-  }
-
-  if (options.network) {
-    await initializeConfig();
-    console.log('Running network tests...');
-    try {
+    } else if (options.network) {
+      console.log('Running network tests...');
       const pingResult = await networkService.runPingTest('8.8.8.8');
       console.log('Ping Test Results:');
       console.log(pingResult);
-    } catch (error) {
-      console.error(`Failed to run network tests: ${error.message}`);
-    }
-    return;
-  }
-
-  if (options.driver) {
-    await initializeConfig();
-    console.log('Checking for driver updates...');
-    try {
+    } else if (options.driver) {
+      console.log('Checking for driver updates...');
       const drivers = await driverService.detectDrivers();
-      if (drivers.length === 0) {
-        console.log('No driver updates available.');
-      } else {
-        console.log('Available Driver Updates:');
-        drivers.forEach(driver => console.log(`  ${driver}`));
-      }
-    } catch (error) {
-      console.error(`Failed to check for driver updates: ${error.message}`);
-    }
-    return;
-  }
-
-  if (options.restore) {
-    await initializeConfig();
-    console.log('Listing system restore points...');
-    try {
+      drivers.forEach(driver => console.log(`  ${driver}`));
+    } else if (options.restore) {
+      console.log('Listing system restore points...');
       const restorePoints = await systemRestoreService.listRestorePoints();
       console.log('System Restore Points:');
       console.log(restorePoints);
-    } catch (error) {
-      console.error(`Failed to list restore points: ${error.message}`);
-    }
-    return;
-  }
-
-  if (options.plugins) {
-    await initializeConfig();
-    console.log('Listing installed plugins...');
-    try {
+    } else if (options.plugins) {
+      console.log('Listing installed plugins...');
       const plugins = pluginService.getLoadedPlugins();
       if (plugins.length === 0) {
         console.log('No plugins installed.');
@@ -3818,93 +3641,19 @@ async function main() {
         console.log('Installed Plugins:');
         plugins.forEach(plugin =>
           console.log(
-            `  ${plugin.name || 'Unknown'} v${plugin.version || '1.0.0'} - ${plugin.description || 'No description'}`
+            `  ${plugin.name || 'Unknown'} v${plugin.version || '1.0.0'} - ${
+              plugin.description || 'No description'
+            }`
           )
         );
       }
-    } catch (error) {
-      console.error(`Failed to list plugins: ${error.message}`);
+    } else {
+      program.outputHelp();
     }
-    return;
+  } else if (process.argv.length > 2) {
+    // If arguments were passed but not parsed as an option (e.g., a command that wasn't 'plugin')
+    program.outputHelp();
   }
-
-  // If no options or commands provided, or if npm start was used, start interactive TUI
-  if ((!hasOptions && !hasCommand) || isNpmStart) {
-    // Check if terminal is interactive
-    const forceInteractive = process.env.FORCE_INTERACTIVE === 'true' || !!process.env.VSCODE_PID;
-
-    if (!forceInteractive && !isInteractiveTerminal()) {
-      showNonInteractiveError();
-      return;
-    }
-
-    // Initialize and start TUI
-    await initializeConfig();
-
-    // Check for updates (only in interactive mode)
-    try {
-      const updateInfo = await checkForUpdates();
-      if (updateInfo.hasUpdate) {
-        console.log(
-          `\n📦 Update available: ${updateInfo.currentVersion} → ${updateInfo.latestVersion}`
-        );
-        console.log(`Run 'npm install -g @involvex/involvex-cli@latest' to update.\n`);
-      }
-    } catch {
-      // Silently ignore update check errors
-    }
-
-    // Restore process.exit now that we're starting interactive mode
-    // The TUI will keep the event loop alive
-    process.exit = originalExit;
-
-    // Start TUI
-    try {
-      await startTUI();
-    } catch (error) {
-      console.error(`Failed to start TUI: ${error.message}`);
-      process.exit(1);
-    }
-    return;
-  }
-
-  // Check if terminal is interactive for command execution
-  const forceInteractive =
-    process.env.FORCE_INTERACTIVE === 'true' ||
-    process.env.VSCODE_PID ||
-    process.platform === 'win32';
-
-  if (!forceInteractive && !isInteractiveTerminal()) {
-    // Don't show error if we're in a command context (plugin commands, etc.)
-    // Only show error if no commands were executed
-    const hasExecutableCommand =
-      options.update ||
-      options.cache ||
-      options.startup ||
-      options.uninstall ||
-      options.dns ||
-      options.network ||
-      options.driver ||
-      options.restore ||
-      options.plugins ||
-      options.serve ||
-      hasCommand;
-
-    if (!hasExecutableCommand) {
-      showNonInteractiveError();
-      return;
-    }
-  }
-
-  // If we reach here and serve was requested, something went wrong
-  // (serve handler should have returned earlier)
-  if (options.serve) {
-    console.error('Web server failed to start properly');
-    process.exit(1);
-  }
-
-  // Initialize configuration for command execution
-  await initializeConfig();
 }
 
 // Run the application
