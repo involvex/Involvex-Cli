@@ -47,6 +47,7 @@ A comprehensive Windows system administration toolkit built with Node.js, provid
 - Interactive menus and dialogs
 - Progress indicators and status updates
 - Keyboard navigation support
+- Built-in Discord Rich Presence integration with random hacker-status messages
 
 ## Installation
 
@@ -101,6 +102,14 @@ involvex-cli --version    # Show version information
 - Press Enter to select options
 - Press F10 or Escape to quit
 - Press F9 for help
+
+## Discord Rich Presence Plugin
+
+- Enable or disable the plugin from `Settings → Discord RPC` directly inside the CLI
+- Default Application ID: `1438575785228242994`
+- Discord Public Key: `fe1dca8f9e7f55080493178e503508b0fd4380c4831186ec5d536c61d942ad6d`
+- Status updates include randomly generated memes such as “Generated 256 cups of coffee ☕”
+- Official artwork (logo, banner, cover image) is available inside the `assets/` directory and is published with the documentation site
 
 ## Supported Package Managers
 
@@ -264,6 +273,11 @@ For issues, questions, or contributions:
 
 - GitHub Issues: Report bugs and request features
 - GitHub Discussions: Ask questions and get help
+
+## Legal
+
+- Terms of Service: [https://involvex.github.io/Involvex-Cli/#terms-of-service](https://involvex.github.io/Involvex-Cli/#terms-of-service)
+- Privacy Policy: [https://involvex.github.io/Involvex-Cli/#privacy-policy](https://involvex.github.io/Involvex-Cli/#privacy-policy)
 
 ## Changelog
 

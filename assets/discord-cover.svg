@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="576" viewBox="0 0 1024 576" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="576" fill="#050505"/>
+  <rect x="24" y="24" width="976" height="528" rx="28" fill="none" stroke="#00ff57" stroke-width="10"/>
+  <text x="50%" y="38%" text-anchor="middle" fill="#00ff57" font-family="JetBrains Mono, 'Courier New', monospace" font-size="120" font-weight="700">InvolveX CLI</text>
+  <text x="50%" y="52%" text-anchor="middle" fill="#00ff57" font-family="JetBrains Mono, 'Courier New', monospace" font-size="64">Discord Rich Presence Plugin</text>
+  <text x="50%" y="68%" text-anchor="middle" fill="#00ff57" font-family="JetBrains Mono, 'Courier New', monospace" font-size="36">
+    Generated 256 cups of coffee ☕
+  </text>
+  <text x="50%" y="80%" text-anchor="middle" fill="#00ff57" font-family="JetBrains Mono, 'Courier New', monospace" font-size="28" opacity="0.8">
+    Ready to broadcast your terminal adventures
+  </text>
+</svg>
+

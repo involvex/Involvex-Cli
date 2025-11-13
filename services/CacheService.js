@@ -69,6 +69,12 @@ class CacheService {
     try {
       this.logService.log('Attempting to clear system memory/RAM.');
 
+      // Force Node.js garbage collection
+      if (global.gc) {
+        global.gc();
+        this.logService.log('Node.js garbage collection triggered.');
+      }
+
       if (process.platform === 'win32') {
         // Use PowerShell to clear system memory
         const psScript = `

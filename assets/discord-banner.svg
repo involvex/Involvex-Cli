@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="680" height="240" viewBox="0 0 680 240" xmlns="http://www.w3.org/2000/svg">
+  <rect width="680" height="240" fill="#050505"/>
+  <rect x="8" y="8" width="664" height="224" rx="20" fill="none" stroke="#00ff57" stroke-width="6"/>
+  <text x="50%" y="48%" text-anchor="middle" fill="#00ff57" font-family="JetBrains Mono, 'Courier New', monospace" font-size="56" font-weight="700">InvolveX CLI · Terminal Hacker Mode</text>
+  <text x="50%" y="72%" text-anchor="middle" fill="#00ff57" font-family="JetBrains Mono, 'Courier New', monospace" font-size="28">
+    $ npm install -g @involvex/involvex-cli
+  </text>
+</svg>
+

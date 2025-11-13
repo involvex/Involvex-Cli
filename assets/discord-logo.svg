@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="1024" fill="#050505"/>
+  <rect x="112" y="112" width="800" height="800" rx="160" fill="none" stroke="#00ff57" stroke-width="24"/>
+  <rect x="192" y="192" width="640" height="640" rx="120" fill="none" stroke="#00ff57" stroke-width="16" opacity="0.6"/>
+  <text x="50%" y="45%" text-anchor="middle" fill="#00ff57" font-family="JetBrains Mono, 'Courier New', monospace" font-size="220" font-weight="700">IVX</text>
+  <text x="50%" y="60%" text-anchor="middle" fill="#00ff57" font-family="JetBrains Mono, 'Courier New', monospace" font-size="80">InvolveX CLI</text>
+  <text x="50%" y="70%" text-anchor="middle" fill="#00ff57" font-family="JetBrains Mono, 'Courier New', monospace" font-size="48">discord rpc · terminal mode</text>
+  <rect x="256" y="736" width="512" height="8" fill="#00ff57" opacity="0.4"/>
+</svg>
+

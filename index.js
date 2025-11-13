@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 
 // Version constant
-const VERSION = '1.0.1';
+const VERSION = '1.0.2';
 
 const blessed = require('blessed');
 const { Command } = require('commander');
+const path = require('path');
+const os = require('os');
 
 // Import services
 const LogService = require('./services/LogService');
@@ -19,10 +21,13 @@ const DriverService = require('./services/DriverService');
 const SystemRestoreService = require('./services/SystemRestoreService');
 const PluginService = require('./services/PluginService');
 const PluginRepositoryService = require('./services/PluginRepositoryService');
+const SettingsService = require('./services/SettingsService');
+const AutoUpdateService = require('./services/AutoUpdateService');
 
 // Initialize services
 const logService = new LogService();
 const configService = new ConfigService(logService);
+const settingsService = new SettingsService(logService);
 const packageManagerService = new PackageManagerService(logService);
 const networkService = new NetworkService(logService);
 const cacheService = new CacheService(logService);
@@ -33,15 +38,181 @@ const driverService = new DriverService(logService);
 const systemRestoreService = new SystemRestoreService(logService);
 const pluginService = new PluginService(logService, configService);
 const pluginRepositoryService = new PluginRepositoryService(logService);
+const autoUpdateService = new AutoUpdateService(logService, settingsService);
+
+process.on('exit', () => {
+  if (global.discordRPCPlugin) {
+    try {
+      global.discordRPCPlugin.stop();
+    } catch {
+      // ignore shutdown errors
+    }
+  }
+});
+
+['SIGINT', 'SIGTERM'].forEach(signal => {
+  process.on(signal, () => {
+    if (global.discordRPCPlugin) {
+      try {
+        global.discordRPCPlugin.stop();
+      } catch {
+        // ignore
+      }
+    }
+    process.exit(0);
+  });
+});
 
 // Initialize configuration
 async function initializeConfig() {
   try {
     await configService.loadConfigAsync();
+    await settingsService.loadSettingsAsync();
     // Initialize plugin services
     await pluginService.initializeAsync();
+
+    // Perform auto-tasks if enabled
+    await performAutoTasks();
   } catch (error) {
     logService.log(`Failed to load configuration: ${error.message}`);
+  }
+}
+
+// Perform auto-tasks based on settings
+async function performAutoTasks() {
+  try {
+    // Auto-update CLI
+    if (settingsService.getAutoUpdateEnabled()) {
+      await autoUpdateService.performAutoUpdate();
+    }
+
+    // Auto cache clearing
+    if (settingsService.shouldRunAutoCacheClearing()) {
+      logService.log('Auto cache clearing triggered...');
+      const success = await cacheService.clearSystemCache();
+      if (success) {
+        settingsService.setLastCacheCleared(Date.now());
+        await settingsService.saveSettingsAsync();
+      }
+    }
+
+    // Auto memory clearing
+    if (settingsService.shouldRunAutoMemoryClearing()) {
+      logService.log('Auto memory clearing triggered...');
+      const success = await cacheService.clearMemory();
+      if (success) {
+        settingsService.setLastMemoryCleared(Date.now());
+        await settingsService.saveSettingsAsync();
+      }
+    }
+
+    // Auto package updates
+    if (settingsService.getPackageAutoUpdateEnabled()) {
+      await performAutoPackageUpdates();
+    }
+
+    // Discord RPC
+    if (settingsService.getDiscordRPCEnabled()) {
+      await initializeDiscordRPC();
+    }
+  } catch (error) {
+    logService.log(`Error performing auto-tasks: ${error.message}`);
+  }
+}
+
+// Initialize Discord RPC if enabled
+async function initializeDiscordRPC() {
+  try {
+    const clientId = settingsService.getDiscordRPCClientId();
+    if (!clientId) {
+      logService.log('Discord RPC client ID not configured');
+      return;
+    }
+
+    if (global.discordRPCPlugin && typeof global.discordRPCPlugin.stop === 'function') {
+      try {
+        await global.discordRPCPlugin.stop();
+      } catch {
+        // ignore stop errors
+      }
+      global.discordRPCPlugin = null;
+    }
+
+    const rpcPlugin = await loadBuiltinPlugin('DiscordRPCPlugin.js');
+    if (!rpcPlugin) {
+      logService.log('Discord RPC plugin not available.');
+      return;
+    }
+
+    const interval = settingsService.getDiscordRPCUpdateInterval() * 1000;
+    const started = await rpcPlugin.start(clientId, interval);
+
+    if (started) {
+      logService.log('Discord RPC started successfully');
+      global.discordRPCPlugin = rpcPlugin;
+    } else {
+      logService.log('Failed to start Discord RPC');
+      if (typeof rpcPlugin.shutdownAsync === 'function') {
+        await rpcPlugin.shutdownAsync();
+      } else if (typeof rpcPlugin.stop === 'function') {
+        await rpcPlugin.stop();
+      }
+    }
+  } catch (error) {
+    logService.log(`Error initializing Discord RPC: ${error.message}`);
+  }
+}
+
+// Perform auto package updates
+async function performAutoPackageUpdates() {
+  try {
+    const managers = settingsService.getPackageAutoUpdateManagers();
+    const updatePromises = [];
+
+    if (managers.winget && (await packageManagerService.isWingetInstalled())) {
+      updatePromises.push(
+        packageManagerService.updateWinget().catch(err => {
+          logService.log(`Auto-update winget failed: ${err.message}`);
+        })
+      );
+    }
+
+    if (managers.npm && (await packageManagerService.isNpmInstalled())) {
+      updatePromises.push(
+        packageManagerService.updateNpm().catch(err => {
+          logService.log(`Auto-update npm failed: ${err.message}`);
+        })
+      );
+    }
+
+    if (managers.scoop && (await packageManagerService.isScoopInstalled())) {
+      updatePromises.push(
+        packageManagerService.updateScoop().catch(err => {
+          logService.log(`Auto-update scoop failed: ${err.message}`);
+        })
+      );
+    }
+
+    if (managers.choco && (await packageManagerService.isChocoInstalled())) {
+      updatePromises.push(
+        packageManagerService.updateChoco().catch(err => {
+          logService.log(`Auto-update choco failed: ${err.message}`);
+        })
+      );
+    }
+
+    if (managers.pip && (await packageManagerService.isPipInstalled())) {
+      updatePromises.push(
+        packageManagerService.updatePip().catch(err => {
+          logService.log(`Auto-update pip failed: ${err.message}`);
+        })
+      );
+    }
+
+    await Promise.all(updatePromises);
+    logService.log('Auto package updates completed');
+  } catch (error) {
+    logService.log(`Error performing auto package updates: ${error.message}`);
   }
 }
 
@@ -119,20 +290,37 @@ function showHelp() {
 InvolveX CLI - Windows System Administration Toolkit
 
 USAGE:
+    involvex-cli [COMMAND] [OPTIONS]
     involvex-cli [OPTIONS]
 
+COMMANDS:
+    plugin <action> [name]    Plugin management
+        list                   List all installed plugins
+        install <path>         Install a plugin from file path
+        uninstall <name>       Uninstall a plugin by name
+        update <name> [path]   Update a plugin (uninstall + reinstall)
+
 OPTIONS:
-    --help, -h, /?     Show this help message
-    --version, -v      Show version information
+    --help, -h, /?            Show this help message
+    --version, -v             Show version information
+    --update                  Check for available package updates
+    --cache                   Clear system and memory caches
+    --startup                 List startup programs
+    --uninstall               List installed programs
+    --dns                     Show DNS configuration
+    --network                 Run network tests (ping)
+    --driver                  Check for driver updates
+    --restore                 List system restore points
+    --plugins                 List installed plugins (legacy, use 'plugin list')
 
 DESCRIPTION:
     InvolveX CLI is a comprehensive Windows system administration toolkit
     that provides an easy-to-use interface for common system maintenance tasks.
 
 FEATURES:
-    • Package Management: Update winget, npm, scoop, choco packages
+    • Package Management: Update winget, npm, scoop, choco, pip packages
     • System Monitoring: CPU, Memory, GPU, Drive usage monitoring
-    • Cache Management: Clear system caches
+    • Cache Management: Clear system caches and memory
     • Startup Programs: List and disable startup programs
     • Program Management: List and uninstall installed programs
     • DNS Configuration: Set and reset DNS servers
@@ -140,22 +328,35 @@ FEATURES:
     • Driver Management: Check and update drivers
     • System Restore: Create and manage restore points
     • Plugin System: Extensible plugin architecture
+    • Settings: Auto-update, auto-cache, auto-memory clearing
+    • Discord RPC: Rich presence integration
 
 PACKAGE MANAGERS SUPPORTED:
     • Winget (Windows Package Manager)
     • NPM (Node Package Manager)
     • Scoop (Command-line installer)
     • Chocolatey (Package manager for Windows)
+    • Pip (Python Package Manager)
+
+PLUGIN EXAMPLES:
+    involvex-cli plugin list
+    involvex-cli plugin install ./my-plugin.js
+    involvex-cli plugin install --path ./my-plugin.js
+    involvex-cli plugin uninstall SystemMonitor
+    involvex-cli plugin update SystemMonitor --path ./updated-plugin.js
+
+EXAMPLES:
+    involvex-cli                    # Start interactive mode
+    involvex-cli --help            # Show this help
+    involvex-cli --version         # Show version
+    involvex-cli --update          # Check for updates
+    involvex-cli --cache           # Clear caches
+    involvex-cli plugin list       # List plugins
 
 SYSTEM REQUIREMENTS:
     • Windows 10/11
     • Node.js 16.0 or higher
     • Administrator privileges for some operations
-
-EXAMPLES:
-    involvex-cli              # Start interactive mode
-    involvex-cli --help       # Show this help
-    involvex-cli --version    # Show version
 
 For more information, visit: https://github.com/involvex/Involvex-Cli
 `;
@@ -196,13 +397,18 @@ For command-line usage, use:
 
 // Main TUI application
 async function startTUI() {
-  // Create screen
+  // Create screen with terminal theme
   const screen = blessed.screen({
     smartCSR: true,
     title: 'InvolveX CLI',
+    fullUnicode: true,
   });
 
-  // Create main layout
+  // Set terminal theme colors (green on black)
+  screen.style.bg = 'black';
+  screen.style.fg = 'green';
+
+  // Create main layout with terminal theme
   const mainFrame = blessed.box({
     top: 1,
     left: 0,
@@ -212,33 +418,36 @@ async function startTUI() {
       type: 'line',
     },
     style: {
+      bg: 'black',
       border: {
-        fg: 'cyan',
+        fg: 'green',
       },
     },
   });
 
-  // Menu bar
+  // Menu bar with terminal theme
   const menuBar = blessed.box({
     top: 0,
     left: 0,
     width: '100%',
     height: 1,
+    content: 'involvex-cli@terminal:~$',
     style: {
-      bg: 'blue',
-      fg: 'white',
+      bg: 'black',
+      fg: 'green',
+      bold: true,
     },
   });
 
-  // Status bar
+  // Status bar with terminal theme
   const statusBar = blessed.box({
     bottom: 0,
     left: 0,
     width: '100%',
     height: 1,
     style: {
-      bg: 'blue',
-      fg: 'white',
+      bg: 'black',
+      fg: 'green',
     },
   });
 
@@ -274,17 +483,20 @@ async function startTUI() {
       type: 'line',
     },
     style: {
+      bg: 'black',
+      fg: 'green',
       border: {
-        fg: 'white',
+        fg: 'green',
       },
       selected: {
-        bg: 'blue',
-        fg: 'white',
+        bg: 'green',
+        fg: 'black',
         bold: true,
       },
       item: {
         hover: {
-          bg: 'cyan',
+          bg: '#003300',
+          fg: '#00ff00',
         },
       },
     },
@@ -312,6 +524,7 @@ async function startTUI() {
       'Driver',
       'System Restore',
       'Plugins',
+      'Settings',
       'Exit',
     ],
   });
@@ -323,8 +536,10 @@ async function startTUI() {
   mainFrame.append(logo);
   mainFrame.append(menuList);
 
-  // Set status bar content
-  statusBar.setContent(' F9: Help | F10: Quit | Use arrow keys to navigate ');
+  // Set status bar content with terminal style
+  statusBar.setContent(
+    ' {green-fg}F9: Help | F10: Quit | ESC: Back | Use arrow keys to navigate{/green-fg} '
+  );
 
   // Menu selection handler
   menuList.on('select', async (item, _index) => {
@@ -358,6 +573,9 @@ async function startTUI() {
           break;
         case 'Plugins':
           await showPluginsMenu(screen);
+          break;
+        case 'Settings':
+          await showSettingsMenu(screen);
           break;
         case 'Exit':
           screen.destroy();
@@ -436,13 +654,16 @@ async function showUpdateMenu(screen) {
     border: {
       type: 'line',
     },
-    label: ' Update Package Managers ',
+    label: ' {green-fg}Update Package Managers{/green-fg} ',
     style: {
+      bg: 'black',
+      fg: 'green',
       border: {
-        fg: 'yellow',
+        fg: 'green',
       },
       selected: {
-        bg: 'blue',
+        bg: 'green',
+        fg: 'black',
       },
     },
     keys: true,
@@ -527,13 +748,16 @@ async function showCacheMenu(screen) {
     border: {
       type: 'line',
     },
-    label: ' Cache Management ',
+    label: ' {green-fg}Cache Management{/green-fg} ',
     style: {
+      bg: 'black',
+      fg: 'green',
       border: {
         fg: 'green',
       },
       selected: {
-        bg: 'blue',
+        bg: 'green',
+        fg: 'black',
       },
     },
     keys: true,
@@ -588,13 +812,16 @@ async function showStartupMenu(screen) {
     border: {
       type: 'line',
     },
-    label: ' Startup Programs ',
+    label: ' {green-fg}Startup Programs{/green-fg} ',
     style: {
+      bg: 'black',
+      fg: 'green',
       border: {
-        fg: 'magenta',
+        fg: 'green',
       },
       selected: {
-        bg: 'blue',
+        bg: 'green',
+        fg: 'black',
       },
     },
     keys: true,
@@ -645,13 +872,16 @@ async function showUninstallMenu(screen) {
     border: {
       type: 'line',
     },
-    label: ' Program Management ',
+    label: ' {green-fg}Program Management{/green-fg} ',
     style: {
+      bg: 'black',
+      fg: 'green',
       border: {
-        fg: 'red',
+        fg: 'green',
       },
       selected: {
-        bg: 'blue',
+        bg: 'green',
+        fg: 'black',
       },
     },
     keys: true,
@@ -702,13 +932,16 @@ async function showDnsMenu(screen) {
     border: {
       type: 'line',
     },
-    label: ' DNS Configuration ',
+    label: ' {green-fg}DNS Configuration{/green-fg} ',
     style: {
+      bg: 'black',
+      fg: 'green',
       border: {
-        fg: 'cyan',
+        fg: 'green',
       },
       selected: {
-        bg: 'blue',
+        bg: 'green',
+        fg: 'black',
       },
     },
     keys: true,
@@ -763,13 +996,16 @@ async function showNetworkMenu(screen) {
     border: {
       type: 'line',
     },
-    label: ' Network Tools ',
+    label: ' {green-fg}Network Tools{/green-fg} ',
     style: {
+      bg: 'black',
+      fg: 'green',
       border: {
-        fg: 'blue',
+        fg: 'green',
       },
       selected: {
-        bg: 'blue',
+        bg: 'green',
+        fg: 'black',
       },
     },
     keys: true,
@@ -820,13 +1056,16 @@ async function showDriverMenu(screen) {
     border: {
       type: 'line',
     },
-    label: ' Driver Management ',
+    label: ' {green-fg}Driver Management{/green-fg} ',
     style: {
+      bg: 'black',
+      fg: 'green',
       border: {
-        fg: 'yellow',
+        fg: 'green',
       },
       selected: {
-        bg: 'blue',
+        bg: 'green',
+        fg: 'black',
       },
     },
     keys: true,
@@ -877,13 +1116,16 @@ async function showSystemRestoreMenu(screen) {
     border: {
       type: 'line',
     },
-    label: ' System Restore ',
+    label: ' {green-fg}System Restore{/green-fg} ',
     style: {
+      bg: 'black',
+      fg: 'green',
       border: {
-        fg: 'red',
+        fg: 'green',
       },
       selected: {
-        bg: 'blue',
+        bg: 'green',
+        fg: 'black',
       },
     },
     keys: true,
@@ -946,7 +1188,7 @@ async function showSystemRestoreMenu(screen) {
 
 // Helper dialog functions
 function showMessage(screen, title, message) {
-  const dialog = blessed.message({
+  const dialog = blessed.box({
     top: 'center',
     left: 'center',
     width: '60%',
@@ -954,8 +1196,10 @@ function showMessage(screen, title, message) {
     border: {
       type: 'line',
     },
-    label: ` ${title} `,
+    label: ` {green-fg}${title}{/green-fg} `,
     style: {
+      bg: 'black',
+      fg: 'green',
       border: {
         fg: 'green',
       },
@@ -963,12 +1207,13 @@ function showMessage(screen, title, message) {
     scrollable: true,
     alwaysScroll: true,
     content: message,
+    keys: true,
   });
 
   screen.append(dialog);
   screen.render();
 
-  dialog.key(['enter', 'escape'], () => {
+  dialog.key(['enter', 'escape', 'q'], () => {
     dialog.destroy();
     screen.render();
   });
@@ -1717,6 +1962,93 @@ async function showDeleteRestorePointDialog(screen) {
   });
 }
 
+async function loadBuiltinPlugin(pluginFileName) {
+  const userPluginsDir = path.join(os.homedir(), 'AppData', 'Roaming', 'InvolveX', 'Plugins');
+  const candidatePaths = [
+    path.join(__dirname, 'plugins', pluginFileName),
+    path.join(userPluginsDir, pluginFileName),
+  ];
+
+  for (const pluginPath of candidatePaths) {
+    try {
+      const resolvedPath = require.resolve(pluginPath);
+      delete require.cache[resolvedPath];
+      const PluginClass = require(pluginPath);
+      if (typeof PluginClass !== 'function') {
+        continue;
+      }
+      const pluginInstance = new PluginClass();
+      if (typeof pluginInstance.initializeAsync === 'function') {
+        await pluginInstance.initializeAsync();
+      }
+      return pluginInstance;
+    } catch (error) {
+      if (error.code !== 'MODULE_NOT_FOUND') {
+        logService.log(`Failed to load plugin '${pluginFileName}': ${error.message}`);
+      }
+    }
+  }
+
+  return null;
+}
+
+async function loadBuiltinPluginsForMenu() {
+  const builtinFiles = [
+    'SystemMonitorPlugin.js',
+    'ProcessManagerPlugin.js',
+    'ServiceManagerPlugin.js',
+  ];
+
+  const plugins = [];
+  for (const fileName of builtinFiles) {
+    const plugin = await loadBuiltinPlugin(fileName);
+    if (plugin) {
+      plugins.push(plugin);
+    }
+  }
+  return plugins;
+}
+
+async function runBuiltinPlugin(screen, pluginFileName, method = 'execute') {
+  const plugin = await loadBuiltinPlugin(pluginFileName);
+  if (!plugin) {
+    showMessage(screen, 'Plugin Missing', 'Plugin not available. Ensure it is installed.');
+    return;
+  }
+
+  try {
+    if (typeof plugin[method] === 'function') {
+      await plugin[method](screen);
+    } else if (typeof plugin.execute === 'function') {
+      await plugin.execute(screen);
+    } else {
+      showMessage(
+        screen,
+        'Plugin Error',
+        `Plugin '${plugin.name || 'Unknown'}' does not support interactive execution.`
+      );
+    }
+  } catch (error) {
+    showMessage(screen, 'Plugin Error', `Plugin execution failed: ${error.message}`);
+  } finally {
+    if (typeof plugin.shutdownAsync === 'function') {
+      await plugin.shutdownAsync();
+    }
+  }
+}
+
+async function showSystemMonitor(screen) {
+  await runBuiltinPlugin(screen, 'SystemMonitorPlugin.js', 'displayMonitor');
+}
+
+async function showProcessManager(screen) {
+  await runBuiltinPlugin(screen, 'ProcessManagerPlugin.js');
+}
+
+async function showServiceManager(screen) {
+  await runBuiltinPlugin(screen, 'ServiceManagerPlugin.js');
+}
+
 async function showPluginsMenu(screen) {
   const pluginsDialog = blessed.list({
     top: 'center',
@@ -1726,13 +2058,16 @@ async function showPluginsMenu(screen) {
     border: {
       type: 'line',
     },
-    label: ' Plugin Management ',
+    label: ' {green-fg}Plugin Management{/green-fg} ',
     style: {
+      bg: 'black',
+      fg: 'green',
       border: {
-        fg: 'magenta',
+        fg: 'green',
       },
       selected: {
-        bg: 'blue',
+        bg: 'green',
+        fg: 'black',
       },
     },
     keys: true,
@@ -1742,6 +2077,9 @@ async function showPluginsMenu(screen) {
       'Install Plugin',
       'Uninstall Plugin',
       'Execute Plugin',
+      'System Monitor',
+      'Process Manager',
+      'Service Manager',
       'Back',
     ],
   });
@@ -1779,6 +2117,18 @@ async function showPluginsMenu(screen) {
           await showExecutePluginDialog(screen);
           break;
         }
+        case 'System Monitor': {
+          await showSystemMonitor(screen);
+          break;
+        }
+        case 'Process Manager': {
+          await showProcessManager(screen);
+          break;
+        }
+        case 'Service Manager': {
+          await showServiceManager(screen);
+          break;
+        }
       }
     } catch (error) {
       showMessage(screen, 'Error', `Plugin operation failed: ${error.message}`);
@@ -1790,6 +2140,9 @@ async function showPluginsMenu(screen) {
         'Install Plugin',
         'Uninstall Plugin',
         'Execute Plugin',
+        'System Monitor',
+        'Process Manager',
+        'Service Manager',
       ].includes(selected)
     ) {
       pluginsDialog.destroy();
@@ -1914,106 +2267,1069 @@ async function showInstallPluginDialog(screen) {
 }
 
 async function showUninstallPluginDialog(screen) {
-  const inputDialog = blessed.prompt({
+  const plugins = pluginService.getLoadedPlugins();
+  if (plugins.length === 0) {
+    showMessage(screen, 'No Plugins', 'No plugins are currently loaded.');
+    return;
+  }
+
+  const pluginList = blessed.list({
     top: 'center',
     left: 'center',
     width: '50%',
-    height: '20%',
+    height: '50%',
     border: {
       type: 'line',
     },
-    label: ' Uninstall Plugin ',
+    label: ' {green-fg}Select Plugin to Uninstall{/green-fg} ',
     style: {
+      bg: 'black',
+      fg: 'green',
       border: {
-        fg: 'magenta',
+        fg: 'green',
+      },
+      selected: {
+        bg: 'green',
+        fg: 'black',
       },
     },
+    keys: true,
+    items: plugins.map(p => `${p.name || 'Unknown'} - ${p.description || 'No description'}`),
   });
 
-  screen.append(inputDialog);
+  screen.append(pluginList);
   screen.render();
+  pluginList.focus();
 
-  inputDialog.input('Enter plugin name to uninstall:', '', async (error, value) => {
-    if (error || !value) {
-      inputDialog.destroy();
-      screen.render();
+  pluginList.on('select', async (item, index) => {
+    const plugin = plugins[index];
+    pluginList.destroy();
+    screen.render();
+
+    if (!plugin?.name) {
+      showMessage(screen, 'Error', 'Invalid plugin selected.');
       return;
     }
 
     try {
-      const success = await pluginService.uninstallPluginAsync(value);
+      const success = await pluginService.uninstallPluginAsync(plugin.name);
       if (success) {
-        showMessage(screen, 'Success', `Plugin '${value}' uninstalled successfully!`);
+        showMessage(screen, 'Success', `Plugin '${plugin.name}' uninstalled successfully!`);
       } else {
-        showMessage(screen, 'Error', `Failed to uninstall plugin '${value}'.`);
+        showMessage(screen, 'Error', `Failed to uninstall plugin '${plugin.name}'.`);
       }
     } catch (error) {
       showMessage(screen, 'Error', `Plugin uninstallation failed: ${error.message}`);
     }
+  });
 
-    inputDialog.destroy();
+  pluginList.key(['escape'], () => {
+    pluginList.destroy();
     screen.render();
   });
 }
 
 async function showExecutePluginDialog(screen) {
-  const inputDialog = blessed.prompt({
+  const builtinPlugins = await loadBuiltinPluginsForMenu();
+  const loadedPlugins = pluginService.getLoadedPlugins();
+  const allPlugins = [...builtinPlugins, ...loadedPlugins].filter(
+    plugin => typeof plugin.execute === 'function' || typeof plugin.displayMonitor === 'function'
+  );
+
+  if (allPlugins.length === 0) {
+    showMessage(screen, 'No Plugins', 'No plugins are currently available to execute.');
+    return;
+  }
+
+  const pluginList = blessed.list({
     top: 'center',
     left: 'center',
-    width: '50%',
-    height: '20%',
+    width: '60%',
+    height: '60%',
     border: {
       type: 'line',
     },
-    label: ' Execute Plugin ',
+    label: ' {green-fg}Select Plugin to Execute{/green-fg} ',
     style: {
+      bg: 'black',
+      fg: 'green',
       border: {
-        fg: 'magenta',
+        fg: 'green',
+      },
+      selected: {
+        bg: 'green',
+        fg: 'black',
       },
     },
+    keys: true,
+    items: allPlugins.map(
+      plugin => `${plugin.name || 'Unknown'} - ${plugin.description || 'No description'}`
+    ),
   });
 
-  screen.append(inputDialog);
+  screen.append(pluginList);
   screen.render();
+  pluginList.focus();
 
-  inputDialog.input('Enter plugin name to execute:', '', async (error, value) => {
-    if (error || !value) {
-      inputDialog.destroy();
-      screen.render();
+  pluginList.on('select', async (item, index) => {
+    const plugin = allPlugins[index];
+    pluginList.destroy();
+    screen.render();
+
+    if (!plugin) {
+      showMessage(screen, 'Plugin Error', 'Unable to load the selected plugin.');
       return;
     }
 
-    // For now, just show a message that plugin execution is not implemented
-    // In a full implementation, this would show plugin menu items
-    showMessage(
-      screen,
-      'Plugin Execution',
-      `Plugin '${value}' execution not yet implemented in this demo.`
-    );
+    try {
+      if (typeof plugin.execute === 'function') {
+        await plugin.execute(screen);
+      } else if (typeof plugin.displayMonitor === 'function') {
+        await plugin.displayMonitor(screen);
+      } else {
+        showMessage(
+          screen,
+          'Plugin Execution',
+          `Plugin '${plugin.name || 'Unknown'}' does not provide an executable action.`
+        );
+      }
+    } catch (error) {
+      showMessage(screen, 'Plugin Execution', `Plugin execution failed: ${error.message}`);
+    } finally {
+      if (typeof plugin.shutdownAsync === 'function') {
+        await plugin.shutdownAsync();
+      }
+    }
+  });
 
-    inputDialog.destroy();
+  pluginList.key(['escape'], () => {
+    pluginList.destroy();
     screen.render();
   });
 }
 
+async function showSettingsMenu(screen) {
+  const settingsDialog = blessed.list({
+    top: 'center',
+    left: 'center',
+    width: '50%',
+    height: '60%',
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Settings{/green-fg} ',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+      selected: {
+        bg: 'green',
+        fg: 'black',
+      },
+    },
+    keys: true,
+    items: [
+      'Auto-Update CLI',
+      'Package Auto-Update',
+      'Auto Cache Clearing',
+      'Auto Memory Clearing',
+      'Discord RPC',
+      'View Settings',
+      'Back',
+    ],
+  });
+
+  screen.append(settingsDialog);
+  screen.render();
+  settingsDialog.focus();
+
+  settingsDialog.on('select', async (item, _index) => {
+    const selected = item.getText();
+
+    try {
+      switch (selected) {
+        case 'Auto-Update CLI': {
+          await showAutoUpdateSettings(screen);
+          break;
+        }
+        case 'Package Auto-Update': {
+          await showPackageAutoUpdateSettings(screen);
+          break;
+        }
+        case 'Auto Cache Clearing': {
+          await showAutoCacheClearingSettings(screen);
+          break;
+        }
+        case 'Auto Memory Clearing': {
+          await showAutoMemoryClearingSettings(screen);
+          break;
+        }
+        case 'Discord RPC': {
+          await showDiscordRPCSettings(screen);
+          break;
+        }
+        case 'View Settings': {
+          await showViewSettings(screen);
+          break;
+        }
+      }
+    } catch (error) {
+      showMessage(screen, 'Error', `Settings operation failed: ${error.message}`);
+    }
+
+    if (
+      selected !== 'Auto-Update CLI' &&
+      selected !== 'Package Auto-Update' &&
+      selected !== 'Auto Cache Clearing' &&
+      selected !== 'Auto Memory Clearing' &&
+      selected !== 'Discord RPC'
+    ) {
+      settingsDialog.destroy();
+      screen.render();
+    }
+  });
+
+  settingsDialog.key(['escape'], () => {
+    settingsDialog.destroy();
+    screen.render();
+  });
+}
+
+async function showAutoUpdateSettings(screen) {
+  const settings = settingsService.getSettings();
+  const form = blessed.form({
+    top: 'center',
+    left: 'center',
+    width: '60%',
+    height: '50%',
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Auto-Update CLI Settings{/green-fg} ',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+  });
+
+  const enabledCheckbox = blessed.checkbox({
+    parent: form,
+    top: 2,
+    left: 2,
+    width: '90%',
+    height: 3,
+    content: 'Enable Auto-Update',
+    checked: settings.autoUpdate?.enabled || false,
+    style: {
+      bg: 'black',
+      fg: 'green',
+    },
+  });
+
+  const autoInstallCheckbox = blessed.checkbox({
+    parent: form,
+    top: 6,
+    left: 2,
+    width: '90%',
+    height: 3,
+    content: 'Auto-Install Updates (if globally installed)',
+    checked: settings.autoUpdate?.autoInstall || false,
+    style: {
+      bg: 'black',
+      fg: 'green',
+    },
+  });
+
+  const intervalInput = blessed.textbox({
+    parent: form,
+    top: 10,
+    left: 2,
+    width: '90%',
+    height: 3,
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Check Interval (hours){/green-fg} ',
+    inputOnFocus: true,
+    value: String(settings.autoUpdate?.checkIntervalHours || 24),
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+  });
+
+  const saveButton = blessed.button({
+    parent: form,
+    top: 14,
+    left: 2,
+    width: 12,
+    height: 3,
+    content: 'Save',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+      focus: {
+        bg: 'green',
+        fg: 'black',
+      },
+    },
+  });
+
+  const cancelButton = blessed.button({
+    parent: form,
+    top: 14,
+    left: 16,
+    width: 12,
+    height: 3,
+    content: 'Cancel',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+      focus: {
+        bg: 'green',
+        fg: 'black',
+      },
+    },
+  });
+
+  screen.append(form);
+  screen.render();
+  enabledCheckbox.focus();
+
+  saveButton.on('press', async () => {
+    const enabled = enabledCheckbox.checked;
+    const autoInstall = autoInstallCheckbox.checked;
+    const interval = parseInt(intervalInput.getValue()) || 24;
+
+    settingsService.updateSettings({
+      autoUpdate: {
+        enabled,
+        autoInstall,
+        checkIntervalHours: interval,
+      },
+    });
+
+    await settingsService.saveSettingsAsync();
+    showMessage(screen, 'Success', 'Auto-update settings saved!');
+    form.destroy();
+    screen.render();
+  });
+
+  cancelButton.on('press', () => {
+    form.destroy();
+    screen.render();
+  });
+
+  form.key(['escape'], () => {
+    form.destroy();
+    screen.render();
+  });
+}
+
+async function showPackageAutoUpdateSettings(screen) {
+  const settings = settingsService.getSettings();
+  const managers = settings.packageAutoUpdate?.managers || {};
+
+  const form = blessed.form({
+    top: 'center',
+    left: 'center',
+    width: '60%',
+    height: '60%',
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Package Auto-Update Settings{/green-fg} ',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+  });
+
+  const enabledCheckbox = blessed.checkbox({
+    parent: form,
+    top: 2,
+    left: 2,
+    width: '90%',
+    height: 3,
+    content: 'Enable Package Auto-Update',
+    checked: settings.packageAutoUpdate?.enabled || false,
+    style: {
+      bg: 'black',
+      fg: 'green',
+    },
+  });
+
+  const wingetCheckbox = blessed.checkbox({
+    parent: form,
+    top: 6,
+    left: 2,
+    width: '90%',
+    height: 3,
+    content: 'Winget',
+    checked: managers.winget || false,
+    style: {
+      bg: 'black',
+      fg: 'green',
+    },
+  });
+
+  const npmCheckbox = blessed.checkbox({
+    parent: form,
+    top: 9,
+    left: 2,
+    width: '90%',
+    height: 3,
+    content: 'NPM',
+    checked: managers.npm || false,
+    style: {
+      bg: 'black',
+      fg: 'green',
+    },
+  });
+
+  const scoopCheckbox = blessed.checkbox({
+    parent: form,
+    top: 12,
+    left: 2,
+    width: '90%',
+    height: 3,
+    content: 'Scoop',
+    checked: managers.scoop || false,
+    style: {
+      bg: 'black',
+      fg: 'green',
+    },
+  });
+
+  const chocoCheckbox = blessed.checkbox({
+    parent: form,
+    top: 15,
+    left: 2,
+    width: '90%',
+    height: 3,
+    content: 'Chocolatey',
+    checked: managers.choco || false,
+    style: {
+      bg: 'black',
+      fg: 'green',
+    },
+  });
+
+  const pipCheckbox = blessed.checkbox({
+    parent: form,
+    top: 18,
+    left: 2,
+    width: '90%',
+    height: 3,
+    content: 'Pip',
+    checked: managers.pip || false,
+    style: {
+      bg: 'black',
+      fg: 'green',
+    },
+  });
+
+  const intervalInput = blessed.textbox({
+    parent: form,
+    top: 21,
+    left: 2,
+    width: '90%',
+    height: 3,
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Check Interval (hours){/green-fg} ',
+    inputOnFocus: true,
+    value: String(settings.packageAutoUpdate?.checkIntervalHours || 24),
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+  });
+
+  const saveButton = blessed.button({
+    parent: form,
+    top: 25,
+    left: 2,
+    width: 12,
+    height: 3,
+    content: 'Save',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+      focus: {
+        bg: 'green',
+        fg: 'black',
+      },
+    },
+  });
+
+  const cancelButton = blessed.button({
+    parent: form,
+    top: 25,
+    left: 16,
+    width: 12,
+    height: 3,
+    content: 'Cancel',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+      focus: {
+        bg: 'green',
+        fg: 'black',
+      },
+    },
+  });
+
+  screen.append(form);
+  screen.render();
+  enabledCheckbox.focus();
+
+  saveButton.on('press', async () => {
+    const enabled = enabledCheckbox.checked;
+    const interval = parseInt(intervalInput.getValue()) || 24;
+
+    settingsService.updateSettings({
+      packageAutoUpdate: {
+        enabled,
+        managers: {
+          winget: wingetCheckbox.checked,
+          npm: npmCheckbox.checked,
+          scoop: scoopCheckbox.checked,
+          choco: chocoCheckbox.checked,
+          pip: pipCheckbox.checked,
+        },
+        checkIntervalHours: interval,
+      },
+    });
+
+    await settingsService.saveSettingsAsync();
+    showMessage(screen, 'Success', 'Package auto-update settings saved!');
+    form.destroy();
+    screen.render();
+  });
+
+  cancelButton.on('press', () => {
+    form.destroy();
+    screen.render();
+  });
+
+  form.key(['escape'], () => {
+    form.destroy();
+    screen.render();
+  });
+}
+
+async function showAutoCacheClearingSettings(screen) {
+  const settings = settingsService.getSettings();
+  const form = blessed.form({
+    top: 'center',
+    left: 'center',
+    width: '60%',
+    height: '40%',
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Auto Cache Clearing Settings{/green-fg} ',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+  });
+
+  const enabledCheckbox = blessed.checkbox({
+    parent: form,
+    top: 2,
+    left: 2,
+    width: '90%',
+    height: 3,
+    content: 'Enable Auto Cache Clearing',
+    checked: settings.autoCacheClearing?.enabled || false,
+    style: {
+      bg: 'black',
+      fg: 'green',
+    },
+  });
+
+  const intervalInput = blessed.textbox({
+    parent: form,
+    top: 6,
+    left: 2,
+    width: '90%',
+    height: 3,
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Interval (hours){/green-fg} ',
+    inputOnFocus: true,
+    value: String(settings.autoCacheClearing?.intervalHours || 168),
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+  });
+
+  const saveButton = blessed.button({
+    parent: form,
+    top: 10,
+    left: 2,
+    width: 12,
+    height: 3,
+    content: 'Save',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+      focus: {
+        bg: 'green',
+        fg: 'black',
+      },
+    },
+  });
+
+  const cancelButton = blessed.button({
+    parent: form,
+    top: 10,
+    left: 16,
+    width: 12,
+    height: 3,
+    content: 'Cancel',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+      focus: {
+        bg: 'green',
+        fg: 'black',
+      },
+    },
+  });
+
+  screen.append(form);
+  screen.render();
+  enabledCheckbox.focus();
+
+  saveButton.on('press', async () => {
+    const enabled = enabledCheckbox.checked;
+    const interval = parseInt(intervalInput.getValue()) || 168;
+
+    settingsService.updateSettings({
+      autoCacheClearing: {
+        enabled,
+        intervalHours: interval,
+        lastCleared: settings.autoCacheClearing?.lastCleared || null,
+      },
+    });
+
+    await settingsService.saveSettingsAsync();
+    showMessage(screen, 'Success', 'Auto cache clearing settings saved!');
+    form.destroy();
+    screen.render();
+  });
+
+  cancelButton.on('press', () => {
+    form.destroy();
+    screen.render();
+  });
+
+  form.key(['escape'], () => {
+    form.destroy();
+    screen.render();
+  });
+}
+
+async function showAutoMemoryClearingSettings(screen) {
+  const settings = settingsService.getSettings();
+  const form = blessed.form({
+    top: 'center',
+    left: 'center',
+    width: '60%',
+    height: '50%',
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Auto Memory Clearing Settings{/green-fg} ',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+  });
+
+  const enabledCheckbox = blessed.checkbox({
+    parent: form,
+    top: 2,
+    left: 2,
+    width: '90%',
+    height: 3,
+    content: 'Enable Auto Memory Clearing',
+    checked: settings.autoMemoryClearing?.enabled || false,
+    style: {
+      bg: 'black',
+      fg: 'green',
+    },
+  });
+
+  const thresholdInput = blessed.textbox({
+    parent: form,
+    top: 6,
+    left: 2,
+    width: '90%',
+    height: 3,
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Threshold (MB){/green-fg} ',
+    inputOnFocus: true,
+    value: String(settings.autoMemoryClearing?.thresholdMB || 4096),
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+  });
+
+  const intervalInput = blessed.textbox({
+    parent: form,
+    top: 10,
+    left: 2,
+    width: '90%',
+    height: 3,
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Interval (minutes){/green-fg} ',
+    inputOnFocus: true,
+    value: String(settings.autoMemoryClearing?.intervalMinutes || 60),
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+  });
+
+  const saveButton = blessed.button({
+    parent: form,
+    top: 14,
+    left: 2,
+    width: 12,
+    height: 3,
+    content: 'Save',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+      focus: {
+        bg: 'green',
+        fg: 'black',
+      },
+    },
+  });
+
+  const cancelButton = blessed.button({
+    parent: form,
+    top: 14,
+    left: 16,
+    width: 12,
+    height: 3,
+    content: 'Cancel',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+      focus: {
+        bg: 'green',
+        fg: 'black',
+      },
+    },
+  });
+
+  screen.append(form);
+  screen.render();
+  enabledCheckbox.focus();
+
+  saveButton.on('press', async () => {
+    const enabled = enabledCheckbox.checked;
+    const threshold = parseInt(thresholdInput.getValue()) || 4096;
+    const interval = parseInt(intervalInput.getValue()) || 60;
+
+    settingsService.updateSettings({
+      autoMemoryClearing: {
+        enabled,
+        thresholdMB: threshold,
+        intervalMinutes: interval,
+        lastCleared: settings.autoMemoryClearing?.lastCleared || null,
+      },
+    });
+
+    await settingsService.saveSettingsAsync();
+    showMessage(screen, 'Success', 'Auto memory clearing settings saved!');
+    form.destroy();
+    screen.render();
+  });
+
+  cancelButton.on('press', () => {
+    form.destroy();
+    screen.render();
+  });
+
+  form.key(['escape'], () => {
+    form.destroy();
+    screen.render();
+  });
+}
+
+async function showDiscordRPCSettings(screen) {
+  const settings = settingsService.getSettings();
+  const form = blessed.form({
+    top: 'center',
+    left: 'center',
+    width: '60%',
+    height: '50%',
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Discord RPC Settings{/green-fg} ',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+  });
+
+  const enabledCheckbox = blessed.checkbox({
+    parent: form,
+    top: 2,
+    left: 2,
+    width: '90%',
+    height: 3,
+    content: 'Enable Discord Rich Presence',
+    checked: settings.discordRPC?.enabled || false,
+    style: {
+      bg: 'black',
+      fg: 'green',
+    },
+  });
+
+  const clientIdInput = blessed.textbox({
+    parent: form,
+    top: 6,
+    left: 2,
+    width: '90%',
+    height: 3,
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Discord Application Client ID{/green-fg} ',
+    inputOnFocus: true,
+    value: settings.discordRPC?.clientId || '',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+  });
+
+  const intervalInput = blessed.textbox({
+    parent: form,
+    top: 10,
+    left: 2,
+    width: '90%',
+    height: 3,
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Update Interval (seconds){/green-fg} ',
+    inputOnFocus: true,
+    value: String(settings.discordRPC?.updateIntervalSeconds || 15),
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+  });
+
+  blessed.box({
+    parent: form,
+    top: 14,
+    left: 2,
+    width: '90%',
+    height: 3,
+    content: '{green-fg}Note: Create a Discord app at discord.com/developers{/green-fg}',
+    style: {
+      bg: 'black',
+      fg: 'green',
+    },
+  });
+
+  const saveButton = blessed.button({
+    parent: form,
+    top: 18,
+    left: 2,
+    width: 12,
+    height: 3,
+    content: 'Save',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+      focus: {
+        bg: 'green',
+        fg: 'black',
+      },
+    },
+  });
+
+  const cancelButton = blessed.button({
+    parent: form,
+    top: 18,
+    left: 16,
+    width: 12,
+    height: 3,
+    content: 'Cancel',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+      focus: {
+        bg: 'green',
+        fg: 'black',
+      },
+    },
+  });
+
+  screen.append(form);
+  screen.render();
+  enabledCheckbox.focus();
+
+  saveButton.on('press', async () => {
+    const enabled = enabledCheckbox.checked;
+    const clientId = clientIdInput.getValue().trim();
+    const interval = parseInt(intervalInput.getValue()) || 15;
+
+    if (enabled && !clientId) {
+      showMessage(screen, 'Error', 'Discord Client ID is required when enabled!');
+      return;
+    }
+
+    settingsService.updateSettings({
+      discordRPC: {
+        enabled,
+        clientId,
+        updateIntervalSeconds: interval,
+      },
+    });
+
+    await settingsService.saveSettingsAsync();
+
+    // Restart Discord RPC if enabled
+    if (enabled && global.discordRPCPlugin) {
+      await global.discordRPCPlugin.stop();
+      delete global.discordRPCPlugin;
+    }
+
+    if (enabled) {
+      await initializeDiscordRPC();
+    } else if (global.discordRPCPlugin) {
+      await global.discordRPCPlugin.stop();
+      delete global.discordRPCPlugin;
+    }
+
+    showMessage(screen, 'Success', 'Discord RPC settings saved!');
+    form.destroy();
+    screen.render();
+  });
+
+  cancelButton.on('press', () => {
+    form.destroy();
+    screen.render();
+  });
+
+  form.key(['escape'], () => {
+    form.destroy();
+    screen.render();
+  });
+}
+
+async function showViewSettings(screen) {
+  const settings = settingsService.getSettings();
+  const settingsText = JSON.stringify(settings, null, 2);
+  showMessage(screen, 'Current Settings', settingsText);
+}
+
 function showHelpDialog(screen) {
-  const helpContent = `
-██╗███╗   ██╗██╗   ██╗ ██████╗ ██╗     ██╗   ██╗███████╗██╗  ██╗
+  const helpContent = `{green-fg}██╗███╗   ██╗██╗   ██╗ ██████╗ ██╗     ██╗   ██╗███████╗██╗  ██╗
 ██║████╗  ██║██║   ██║██╔═══██╗██║     ██║   ██║██╔════╝╚██╗██╔╝
 ██║██╔██╗ ██║██║   ██║██║   ██║██║     ██║   ██║█████╗   ╚███╔╝
 ██║██║╚██╗██║╚██╗ ██╔╝██║   ██║██║     ╚██╗ ██╔╝██╔══╝   ██╔██╗
 ██║██║ ╚████║ ╚████╔╝ ╚██████╔╝███████╗ ╚████╔╝ ███████╗██╔╝ ██╗
 ╚═╝╚═╝  ╚═══╝  ╚═══╝   ╚═════╝ ╚══════╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝
 
-              Windows System Administration Toolkit
+              Windows System Administration Toolkit{/green-fg}
 
-NAVIGATION:
+{green-fg}NAVIGATION:{/green-fg}
 • Use arrow keys to navigate menus
 • Press Enter to select an option
 • Press F10 or Escape to quit
 • Press F9 for this help
 
-FEATURES:
+{green-fg}FEATURES:{/green-fg}
 • Update: Update package managers and packages
 • Cache: Clear system and memory caches
 • Startup: Manage startup programs
@@ -2023,16 +3339,46 @@ FEATURES:
 • Driver: Check and update drivers
 • System Restore: Manage restore points
 • Plugins: Extensible plugin system
+• Settings: Configure auto-updates and automation
 
-SHORTCUTS:
+{green-fg}SHORTCUTS:{/green-fg}
 • F10: Quit application
 • F9: Show help
 • Escape: Go back/Cancel
 
-For more information, visit: https://github.com/involvex/Involvex-Cli
-`;
+{green-fg}For more information, visit: https://github.com/involvex/Involvex-Cli{/green-fg}`;
 
-  showMessage(screen, 'Help', helpContent);
+  const helpDialog = blessed.box({
+    top: 'center',
+    left: 'center',
+    width: '80%',
+    height: '80%',
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Help{/green-fg} ',
+    content: helpContent,
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+    scrollable: true,
+    alwaysScroll: true,
+    keys: true,
+  });
+
+  screen.append(helpDialog);
+  screen.render();
+
+  helpDialog.key(['enter', 'escape', 'q'], () => {
+    helpDialog.destroy();
+    screen.render();
+  });
+
+  helpDialog.focus();
 }
 
 // Main function
@@ -2043,9 +3389,111 @@ async function main() {
   program
     .name('involvex-cli')
     .description('Windows System Administration Toolkit')
-    .version(VERSION)
-    .option('--help', 'Show help information')
-    .option('--version', 'Show version information')
+    .version(VERSION);
+
+  // Plugin management commands
+  program
+    .command('plugin')
+    .description('Plugin management commands')
+    .argument('[action]', 'Action: list, install, uninstall, update')
+    .argument('[name]', 'Plugin name (for install/uninstall/update)')
+    .option('-p, --path <path>', 'Plugin file path (for install)')
+    .action(async (action, name, options) => {
+      await initializeConfig();
+
+      if (!action || action === 'list') {
+        // List plugins
+        try {
+          const plugins = pluginService.getLoadedPlugins();
+          if (plugins.length === 0) {
+            console.log('No plugins installed.');
+          } else {
+            console.log('Installed Plugins:');
+            plugins.forEach(plugin => {
+              console.log(
+                `  ${plugin.name || 'Unknown'} v${plugin.version || '1.0.0'} - ${plugin.description || 'No description'}`
+              );
+            });
+          }
+        } catch (error) {
+          console.error(`Failed to list plugins: ${error.message}`);
+          process.exit(1);
+        }
+      } else if (action === 'install') {
+        // Install plugin
+        if (!options.path && !name) {
+          console.error(
+            'Error: Plugin path required. Use --path <path> or provide plugin file path.'
+          );
+          process.exit(1);
+        }
+        const pluginPath = options.path || name;
+        try {
+          console.log(`Installing plugin from: ${pluginPath}`);
+          const success = await pluginService.installPluginAsync(pluginPath);
+          if (success) {
+            console.log('Plugin installed successfully!');
+          } else {
+            console.error('Failed to install plugin.');
+            process.exit(1);
+          }
+        } catch (error) {
+          console.error(`Failed to install plugin: ${error.message}`);
+          process.exit(1);
+        }
+      } else if (action === 'uninstall') {
+        // Uninstall plugin
+        if (!name) {
+          console.error('Error: Plugin name required.');
+          process.exit(1);
+        }
+        try {
+          console.log(`Uninstalling plugin: ${name}`);
+          const success = await pluginService.uninstallPluginAsync(name);
+          if (success) {
+            console.log('Plugin uninstalled successfully!');
+          } else {
+            console.error('Failed to uninstall plugin.');
+            process.exit(1);
+          }
+        } catch (error) {
+          console.error(`Failed to uninstall plugin: ${error.message}`);
+          process.exit(1);
+        }
+      } else if (action === 'update') {
+        // Update plugin
+        if (!name) {
+          console.error('Error: Plugin name required.');
+          process.exit(1);
+        }
+        try {
+          console.log(`Updating plugin: ${name}`);
+          // First uninstall, then reinstall if path provided
+          const uninstalled = await pluginService.uninstallPluginAsync(name);
+          if (uninstalled && options.path) {
+            const installed = await pluginService.installPluginAsync(options.path);
+            if (installed) {
+              console.log('Plugin updated successfully!');
+            } else {
+              console.error('Failed to reinstall plugin after uninstall.');
+              process.exit(1);
+            }
+          } else {
+            console.log('Plugin uninstalled. Use "plugin install --path <path>" to reinstall.');
+          }
+        } catch (error) {
+          console.error(`Failed to update plugin: ${error.message}`);
+          process.exit(1);
+        }
+      } else {
+        console.error(`Unknown plugin action: ${action}`);
+        console.log('Available actions: list, install, uninstall, update');
+        process.exit(1);
+      }
+    });
+
+  // Legacy options for backward compatibility
+  program
     .option('--update', 'Update package managers and packages')
     .option('--cache', 'Clear system and memory caches')
     .option('--startup', 'List startup programs')
@@ -2054,7 +3502,7 @@ async function main() {
     .option('--network', 'Run network tests')
     .option('--driver', 'Check for driver updates')
     .option('--restore', 'List system restore points')
-    .option('--plugins', 'List installed plugins');
+    .option('--plugins', 'List installed plugins (use "plugin list" instead)');
 
   // Parse arguments
   program.parse();
@@ -2209,7 +3657,9 @@ async function main() {
       } else {
         console.log('Installed Plugins:');
         plugins.forEach(plugin =>
-          console.log(`  ${plugin.name || 'Unknown'} - ${plugin.description || 'No description'}`)
+          console.log(
+            `  ${plugin.name || 'Unknown'} v${plugin.version || '1.0.0'} - ${plugin.description || 'No description'}`
+          )
         );
       }
     } catch (error) {
@@ -2219,15 +3669,30 @@ async function main() {
   }
 
   // Check if terminal is interactive
-  // TEMP: Allow VS Code for development
+  // Allow Windows and force interactive flag
   const forceInteractive =
     process.env.FORCE_INTERACTIVE === 'true' ||
     process.env.VSCODE_PID ||
     process.platform === 'win32';
 
   if (!forceInteractive && !isInteractiveTerminal()) {
-    showNonInteractiveError();
-    return;
+    // Don't show error if we're in a command context (plugin commands, etc.)
+    // Only show error if no commands were executed
+    const hasCommand =
+      options.update ||
+      options.cache ||
+      options.startup ||
+      options.uninstall ||
+      options.dns ||
+      options.network ||
+      options.driver ||
+      options.restore ||
+      options.plugins;
+
+    if (!hasCommand) {
+      showNonInteractiveError();
+      return;
+    }
   }
 
   // Initialize configuration
