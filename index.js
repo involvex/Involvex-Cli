@@ -50,46 +50,36 @@ async function checkForUpdates() {
 
     return new Promise((resolve, reject) => {
       const url = `https://registry.npmjs.org/${packageName}/latest`;
-      https.get(url, (res) => {
-        let data = '';
-        res.on('data', (chunk) => data += chunk);
-        res.on('end', () => {
-          try {
-            const latestInfo = JSON.parse(data);
-            const currentVersion = '1.0.0';
-            const latestVersion = latestInfo.version;
+      https
+        .get(url, res => {
+          let data = '';
+          res.on('data', chunk => (data += chunk));
+          res.on('end', () => {
+            try {
+              const latestInfo = JSON.parse(data);
+              const currentVersion = '1.0.0';
+              const latestVersion = latestInfo.version;
 
-            if (latestVersion > currentVersion) {
-              resolve({
-                hasUpdate: true,
-                currentVersion,
-                latestVersion,
-                description: latestInfo.description || 'New version available'
-              });
-            } else {
-              resolve({ hasUpdate: false });
+              if (latestVersion > currentVersion) {
+                resolve({
+                  hasUpdate: true,
+                  currentVersion,
+                  latestVersion,
+                  description: latestInfo.description || 'New version available',
+                });
+              } else {
+                resolve({ hasUpdate: false });
+              }
+            } catch (error) {
+              reject(error);
             }
-          } catch (error) {
-            reject(error);
-          }
-        });
-      }).on('error', reject);
+          });
+        })
+        .on('error', reject);
     });
   } catch (error) {
     logService.log(`Failed to check for updates: ${error.message}`);
     return { hasUpdate: false };
-  }
-}
-
-async function performAutoUpdate() {
-  try {
-    const { execSync } = require('child_process');
-    console.log('Updating InvolveX CLI...');
-    execSync('npm install -g @involvex/involvex-cli@latest', { stdio: 'inherit' });
-    console.log('Update completed! Please restart the application.');
-    process.exit(0);
-  } catch (error) {
-    console.error(`Failed to update: ${error.message}`);
   }
 }
 
@@ -296,58 +286,58 @@ async function startTUI() {
     },
   });
 
-    // Main menu list
-    const menuList = blessed.list({
-        top: 10,
-        left: 'center',
-        width: '60%',
-        height: '60%',
-        border: {
-            type: 'line',
+  // Main menu list
+  const menuList = blessed.list({
+    top: 10,
+    left: 'center',
+    width: '60%',
+    height: '60%',
+    border: {
+      type: 'line',
+    },
+    style: {
+      border: {
+        fg: 'white',
+      },
+      selected: {
+        bg: 'blue',
+        fg: 'white',
+        bold: true,
+      },
+      item: {
+        hover: {
+          bg: 'cyan',
         },
-        style: {
-            border: {
-                fg: 'white',
-            },
-            selected: {
-                bg: 'blue',
-                fg: 'white',
-                bold: true,
-            },
-            item: {
-                hover: {
-                    bg: 'cyan',
-                },
-            },
-        },
-        keys: ['up', 'down', 'enter'],
-        mouse: true,
-        interactive: true,
-        invertSelected: true,
-        scrollable: true,
-        alwaysScroll: true,
-        scrollbar: {
-            ch: ' ',
-            track: {
-                bg: 'cyan',
-            },
-            style: {
-                inverse: true,
-            },
-        },
-        items: [
-            'Update',
-            'Cache',
-            'Startup',
-            'Uninstall',
-            'DNS',
-            'Network',
-            'Driver',
-            'System Restore',
-            'Plugins',
-            'Exit',
-        ],
-    });
+      },
+    },
+    keys: ['up', 'down', 'enter'],
+    mouse: true,
+    interactive: true,
+    invertSelected: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: {
+      ch: ' ',
+      track: {
+        bg: 'cyan',
+      },
+      style: {
+        inverse: true,
+      },
+    },
+    items: [
+      'Update',
+      'Cache',
+      'Startup',
+      'Uninstall',
+      'DNS',
+      'Network',
+      'Driver',
+      'System Restore',
+      'Plugins',
+      'Exit',
+    ],
+  });
 
   // Add elements to screen
   screen.append(menuBar);
@@ -424,7 +414,12 @@ async function startTUI() {
   });
 
   menuList.key(['enter'], () => {
-    menuList.enterSelected();
+    const selectedIndex = menuList.selected;
+    const selectedItem = menuList.items[selectedIndex];
+    if (selectedItem) {
+      // Manually trigger the select event
+      menuList.emit('select', selectedItem, selectedIndex);
+    }
   });
 
   // Key bindings
@@ -2010,7 +2005,9 @@ async function main() {
       } else {
         console.log(`Found ${updates.length} available update(s):`);
         updates.forEach(update => {
-          console.log(`${update.packageManager.toUpperCase()}: ${update.packageName} (${update.currentVersion} → ${update.availableVersion})`);
+          console.log(
+            `${update.packageManager.toUpperCase()}: ${update.packageName} (${update.currentVersion} → ${update.availableVersion})`
+          );
         });
       }
     } catch (error) {
@@ -2133,7 +2130,9 @@ async function main() {
         console.log('No plugins installed.');
       } else {
         console.log('Installed Plugins:');
-        plugins.forEach(plugin => console.log(`  ${plugin.name || 'Unknown'} - ${plugin.description || 'No description'}`));
+        plugins.forEach(plugin =>
+          console.log(`  ${plugin.name || 'Unknown'} - ${plugin.description || 'No description'}`)
+        );
       }
     } catch (error) {
       console.error(`Failed to list plugins: ${error.message}`);
@@ -2160,7 +2159,9 @@ async function main() {
   try {
     const updateInfo = await checkForUpdates();
     if (updateInfo.hasUpdate) {
-      console.log(`\n📦 Update available: ${updateInfo.currentVersion} → ${updateInfo.latestVersion}`);
+      console.log(
+        `\n📦 Update available: ${updateInfo.currentVersion} → ${updateInfo.latestVersion}`
+      );
       console.log(`Run 'npm install -g @involvex/involvex-cli@latest' to update.\n`);
     }
   } catch {

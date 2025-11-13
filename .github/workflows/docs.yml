@@ -27,13 +27,11 @@ jobs:
           node-version: 20.x
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
-
       - name: Build documentation
         run: |
           mkdir -p docs
           cp README.md docs/
+          cp index.html docs/
           cp -r assets docs/ 2>/dev/null || true
 
       - name: Setup Pages

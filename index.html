@@ -1,294 +1,308 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>InvolveX CLI - Windows System Administration Toolkit</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+      }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
 
-        .header {
-            text-align: center;
-            color: white;
-            margin-bottom: 50px;
+      .header {
+        text-align: center;
+        color: white;
+        margin-bottom: 50px;
+      }
+
+      .logo {
+        font-family: 'Courier New', monospace;
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #00ff88;
+        text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        margin-bottom: 20px;
+        white-space: pre;
+      }
+
+      .subtitle {
+        font-size: 1.5rem;
+        margin-bottom: 10px;
+        opacity: 0.9;
+      }
+
+      .tagline {
+        font-size: 1.1rem;
+        opacity: 0.8;
+      }
+
+      .main-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 40px;
+        margin-bottom: 50px;
+      }
+
+      .card {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(10px);
+      }
+
+      .card h2 {
+        color: #2c3e50;
+        margin-bottom: 20px;
+        font-size: 1.8rem;
+        border-bottom: 3px solid #3498db;
+        padding-bottom: 10px;
+      }
+
+      .feature-list {
+        list-style: none;
+      }
+
+      .feature-list li {
+        margin-bottom: 15px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #3498db;
+      }
+
+      .install-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 40px;
+        border-radius: 15px;
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .install-command {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 20px;
+        border-radius: 10px;
+        font-family: 'Courier New', monospace;
+        font-size: 1.2rem;
+        margin: 20px 0;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+      }
+
+      .buttons {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        display: inline-block;
+        padding: 15px 30px;
+        background: #3498db;
+        color: white;
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+      }
+
+      .btn:hover {
+        background: #2980b9;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      }
+
+      .btn.secondary {
+        background: transparent;
+        border-color: white;
+      }
+
+      .btn.secondary:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+      }
+
+      .feature-item {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        border: 1px solid #e9ecef;
+      }
+
+      .feature-item h3 {
+        color: #2c3e50;
+        margin-bottom: 10px;
+      }
+
+      .feature-item p {
+        color: #6c757d;
+        font-size: 0.9rem;
+      }
+
+      .footer {
+        text-align: center;
+        color: white;
+        opacity: 0.8;
+        margin-top: 50px;
+      }
+
+      .footer a {
+        color: #00ff88;
+        text-decoration: none;
+      }
+
+      .footer a:hover {
+        text-decoration: underline;
+      }
+
+      @media (max-width: 768px) {
+        .main-content {
+          grid-template-columns: 1fr;
         }
 
         .logo {
-            font-family: 'Courier New', monospace;
-            font-size: 2.5rem;
-            font-weight: bold;
-            color: #00ff88;
-            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
-            margin-bottom: 20px;
-            white-space: pre;
-        }
-
-        .subtitle {
-            font-size: 1.5rem;
-            margin-bottom: 10px;
-            opacity: 0.9;
-        }
-
-        .tagline {
-            font-size: 1.1rem;
-            opacity: 0.8;
-        }
-
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 40px;
-            margin-bottom: 50px;
-        }
-
-        .card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            backdrop-filter: blur(10px);
-        }
-
-        .card h2 {
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-size: 1.8rem;
-            border-bottom: 3px solid #3498db;
-            padding-bottom: 10px;
-        }
-
-        .feature-list {
-            list-style: none;
-        }
-
-        .feature-list li {
-            margin-bottom: 15px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border-left: 4px solid #3498db;
-        }
-
-        .install-section {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px;
-            border-radius: 15px;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .install-command {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 20px;
-            border-radius: 10px;
-            font-family: 'Courier New', monospace;
-            font-size: 1.2rem;
-            margin: 20px 0;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+          font-size: 2rem;
         }
 
         .buttons {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            flex-wrap: wrap;
+          flex-direction: column;
+          align-items: center;
         }
 
         .btn {
-            display: inline-block;
-            padding: 15px 30px;
-            background: #3498db;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            border: 2px solid transparent;
+          width: 200px;
         }
-
-        .btn:hover {
-            background: #2980b9;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        .btn.secondary {
-            background: transparent;
-            border-color: white;
-        }
-
-        .btn.secondary:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-
-        .feature-item {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            text-align: center;
-            border: 1px solid #e9ecef;
-        }
-
-        .feature-item h3 {
-            color: #2c3e50;
-            margin-bottom: 10px;
-        }
-
-        .feature-item p {
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
-
-        .footer {
-            text-align: center;
-            color: white;
-            opacity: 0.8;
-            margin-top: 50px;
-        }
-
-        .footer a {
-            color: #00ff88;
-            text-decoration: none;
-        }
-
-        .footer a:hover {
-            text-decoration: underline;
-        }
-
-        @media (max-width: 768px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-
-            .logo {
-                font-size: 2rem;
-            }
-
-            .buttons {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .btn {
-                width: 200px;
-            }
-        }
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container">
-        <header class="header">
-            <div class="logo">
-██╗███╗   ██╗██╗   ██╗ ██████╗ ██╗     ██╗   ██╗███████╗██╗  ██╗
-██║████╗  ██║██║   ██║██╔═══██╗██║     ██║   ██║██╔════╝╚██╗██╔╝
-██║██╔██╗ ██║██║   ██║██║   ██║██║     ██║   ██║█████╗   ╚███╔╝
-██║██║╚██╗██║╚██╗ ██╔╝██║   ██║██║     ╚██╗ ██╔╝██╔══╝   ██╔██╗
-██║██║ ╚████║ ╚████╔╝ ╚██████╔╝███████╗ ╚████╔╝ ███████╗██╔╝ ██╗
-╚═╝╚═╝  ╚═══╝  ╚═══╝   ╚═════╝ ╚══════╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝
-            </div>
-            <h1 class="subtitle">Windows System Administration Toolkit</h1>
-            <p class="tagline">A comprehensive command-line tool for Windows system maintenance and administration</p>
-        </header>
+      <header class="header">
+        <div class="logo">
+          ██╗███╗ ██╗██╗ ██╗ ██████╗ ██╗ ██╗ ██╗███████╗██╗ ██╗ ██║████╗ ██║██║ ██║██╔═══██╗██║ ██║
+          ██║██╔════╝╚██╗██╔╝ ██║██╔██╗ ██║██║ ██║██║ ██║██║ ██║ ██║█████╗ ╚███╔╝ ██║██║╚██╗██║╚██╗
+          ██╔╝██║ ██║██║ ╚██╗ ██╔╝██╔══╝ ██╔██╗ ██║██║ ╚████║ ╚████╔╝ ╚██████╔╝███████╗ ╚████╔╝
+          ███████╗██╔╝ ██╗ ╚═╝╚═╝ ╚═══╝ ╚═══╝ ╚═════╝ ╚══════╝ ╚═══╝ ╚══════╝╚═╝ ╚═╝
+        </div>
+        <h1 class="subtitle">Windows System Administration Toolkit</h1>
+        <p class="tagline">
+          A comprehensive command-line tool for Windows system maintenance and administration
+        </p>
+      </header>
 
-        <section class="install-section">
-            <h2>🚀 Get Started</h2>
-            <p>Install InvolveX CLI globally via npm:</p>
-            <div class="install-command">npm install -g @involvex/involvex-cli</div>
-            <div class="buttons">
-                <a href="#features" class="btn">Explore Features</a>
-                <a href="https://github.com/involvex/Involvex-Cli" class="btn secondary">View on GitHub</a>
-            </div>
-        </section>
+      <section class="install-section">
+        <h2>🚀 Get Started</h2>
+        <p>Install InvolveX CLI globally via npm:</p>
+        <div class="install-command">npm install -g @involvex/involvex-cli</div>
+        <div class="buttons">
+          <a href="#features" class="btn">Explore Features</a>
+          <a href="https://github.com/involvex/Involvex-Cli" class="btn secondary"
+            >View on GitHub</a
+          >
+        </div>
+      </section>
 
-        <main class="main-content">
-            <div class="card">
-                <h2>✨ Key Features</h2>
-                <ul class="feature-list">
-                    <li><strong>Package Management:</strong> Update winget, npm, scoop, and Chocolatey packages</li>
-                    <li><strong>System Monitoring:</strong> CPU, memory, GPU, and drive usage monitoring</li>
-                    <li><strong>Cache Management:</strong> Clear system and memory caches</li>
-                    <li><strong>Startup Programs:</strong> List and disable startup programs</li>
-                    <li><strong>Program Management:</strong> List and uninstall installed programs</li>
-                    <li><strong>DNS Configuration:</strong> Set and reset DNS servers</li>
-                    <li><strong>Network Tools:</strong> Ping tests and speed tests</li>
-                    <li><strong>Driver Management:</strong> Check and update drivers</li>
-                    <li><strong>System Restore:</strong> Create and manage restore points</li>
-                    <li><strong>Plugin System:</strong> Extensible plugin architecture</li>
-                </ul>
-            </div>
+      <main class="main-content">
+        <div class="card">
+          <h2>✨ Key Features</h2>
+          <ul class="feature-list">
+            <li>
+              <strong>Package Management:</strong> Update winget, npm, scoop, and Chocolatey
+              packages
+            </li>
+            <li>
+              <strong>System Monitoring:</strong> CPU, memory, GPU, and drive usage monitoring
+            </li>
+            <li><strong>Cache Management:</strong> Clear system and memory caches</li>
+            <li><strong>Startup Programs:</strong> List and disable startup programs</li>
+            <li><strong>Program Management:</strong> List and uninstall installed programs</li>
+            <li><strong>DNS Configuration:</strong> Set and reset DNS servers</li>
+            <li><strong>Network Tools:</strong> Ping tests and speed tests</li>
+            <li><strong>Driver Management:</strong> Check and update drivers</li>
+            <li><strong>System Restore:</strong> Create and manage restore points</li>
+            <li><strong>Plugin System:</strong> Extensible plugin architecture</li>
+          </ul>
+        </div>
 
-            <div class="card">
-                <h2>📋 Usage Examples</h2>
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.9rem; line-height: 1.8;">
-                    <div><strong>$ involvex-cli</strong>              # Start interactive mode</div>
-                    <div><strong>$ involvex-cli --help</strong>       # Show help information</div>
-                    <div><strong>$ involvex-cli --version</strong>    # Show version</div>
-                    <div><strong>$ involvex-cli --update</strong>     # Check for updates</div>
-                    <div><strong>$ involvex-cli --cache</strong>      # Clear system caches</div>
-                    <div><strong>$ involvex-cli --startup</strong>    # List startup programs</div>
-                    <div><strong>$ involvex-cli --network</strong>    # Run network tests</div>
-                </div>
-            </div>
-        </main>
+        <div class="card">
+          <h2>📋 Usage Examples</h2>
+          <div
+            style="
+              background: #f8f9fa;
+              padding: 20px;
+              border-radius: 8px;
+              font-family: 'Courier New', monospace;
+              font-size: 0.9rem;
+              line-height: 1.8;
+            "
+          >
+            <div><strong>$ involvex-cli</strong> # Start interactive mode</div>
+            <div><strong>$ involvex-cli --help</strong> # Show help information</div>
+            <div><strong>$ involvex-cli --version</strong> # Show version</div>
+            <div><strong>$ involvex-cli --update</strong> # Check for updates</div>
+            <div><strong>$ involvex-cli --cache</strong> # Clear system caches</div>
+            <div><strong>$ involvex-cli --startup</strong> # List startup programs</div>
+            <div><strong>$ involvex-cli --network</strong> # Run network tests</div>
+          </div>
+        </div>
+      </main>
 
-        <section class="card" id="features">
-            <h2>🔧 Supported Package Managers</h2>
-            <div class="features-grid">
-                <div class="feature-item">
-                    <h3>🪟 Winget</h3>
-                    <p>Microsoft's official Windows Package Manager for modern Windows applications</p>
-                </div>
-                <div class="feature-item">
-                    <h3>📦 NPM</h3>
-                    <p>Node Package Manager for JavaScript development tools and libraries</p>
-                </div>
-                <div class="feature-item">
-                    <h3>🍴 Scoop</h3>
-                    <p>A command-line installer for Windows that focuses on developer tools</p>
-                </div>
-                <div class="feature-item">
-                    <h3>🍫 Chocolatey</h3>
-                    <p>The package manager for Windows software installation and updates</p>
-                </div>
-            </div>
-        </section>
+      <section class="card" id="features">
+        <h2>🔧 Supported Package Managers</h2>
+        <div class="features-grid">
+          <div class="feature-item">
+            <h3>🪟 Winget</h3>
+            <p>Microsoft's official Windows Package Manager for modern Windows applications</p>
+          </div>
+          <div class="feature-item">
+            <h3>📦 NPM</h3>
+            <p>Node Package Manager for JavaScript development tools and libraries</p>
+          </div>
+          <div class="feature-item">
+            <h3>🍴 Scoop</h3>
+            <p>A command-line installer for Windows that focuses on developer tools</p>
+          </div>
+          <div class="feature-item">
+            <h3>🍫 Chocolatey</h3>
+            <p>The package manager for Windows software installation and updates</p>
+          </div>
+        </div>
+      </section>
 
-        <footer class="footer">
-            <p>
-                Built with ❤️ using Node.js •
-                <a href="https://github.com/involvex/Involvex-Cli">GitHub Repository</a> •
-                <a href="https://www.npmjs.com/package/@involvex/involvex-cli">NPM Package</a>
-            </p>
-            <p style="margin-top: 10px; font-size: 0.9rem;">
-                © 2025 InvolveX CLI. Licensed under MIT.
-            </p>
-        </footer>
+      <footer class="footer">
+        <p>
+          Built with ❤️ using Node.js •
+          <a href="https://github.com/involvex/Involvex-Cli">GitHub Repository</a> •
+          <a href="https://www.npmjs.com/package/@involvex/involvex-cli">NPM Package</a>
+        </p>
+        <p style="margin-top: 10px; font-size: 0.9rem">© 2025 InvolveX CLI. Licensed under MIT.</p>
+      </footer>
     </div>
-</body>
+  </body>
 </html>
