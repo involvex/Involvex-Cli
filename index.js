@@ -3541,7 +3541,13 @@ async function main() {
   let suppressOutput = false;
 
   process.exit = code => {
-    if (code === 0 && !process.argv.includes('--help') && !process.argv.includes('-h')) {
+    // Don't prevent exit if serve is running - let it handle its own lifecycle
+    if (
+      code === 0 &&
+      !process.argv.includes('--help') &&
+      !process.argv.includes('-h') &&
+      !process.argv.includes('--serve')
+    ) {
       // Commander wants to exit, but we'll handle it ourselves
       return;
     }
@@ -3549,7 +3555,12 @@ async function main() {
   };
 
   // Temporarily suppress output during parsing if not explicitly requesting help
-  if (!process.argv.includes('--help') && !process.argv.includes('-h')) {
+  // But don't suppress if serve is being used (we want to see server messages)
+  if (
+    !process.argv.includes('--help') &&
+    !process.argv.includes('-h') &&
+    !process.argv.includes('--serve')
+  ) {
     suppressOutput = true;
     process.stdout.write = () => true;
     process.stderr.write = () => true;
@@ -3560,7 +3571,10 @@ async function main() {
   } catch {
     // Ignore parse errors, we'll handle them ourselves
   } finally {
-    process.exit = originalExit;
+    // Restore process.exit after parsing, but only if not serving
+    if (!process.argv.includes('--serve')) {
+      process.exit = originalExit;
+    }
     if (suppressOutput) {
       process.stdout.write = originalWrite;
       process.stderr.write = originalErrWrite;
@@ -3626,21 +3640,22 @@ async function main() {
       console.log('Press Ctrl+C to stop the server\n');
 
       // Handle graceful shutdown
-      process.on('SIGINT', async () => {
+      const shutdown = async () => {
         console.log('\nShutting down web server...');
         await webServer.stop();
         process.exit(0);
-      });
+      };
 
-      process.on('SIGTERM', async () => {
-        await webServer.stop();
-        process.exit(0);
-      });
+      process.on('SIGINT', shutdown);
+      process.on('SIGTERM', shutdown);
+
+      // The Express server keeps the event loop alive, so the process won't exit
+      // We return here to prevent further execution, but the server will keep running
+      return;
     } catch (error) {
       console.error(`Failed to start web server: ${error.message}`);
       process.exit(1);
     }
-    return;
   }
 
   // Handle direct command execution
