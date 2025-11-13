@@ -310,7 +310,6 @@ async function startTUI() {
         },
       },
     },
-    keys: ['up', 'down', 'enter'],
     mouse: true,
     interactive: true,
     invertSelected: true,
