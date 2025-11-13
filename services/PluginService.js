@@ -290,29 +290,44 @@ class PluginService {
 
   async loadEnabledPluginsAsync() {
     try {
-      // Load plugins from plugins directory
-      const pluginsDir = this.getPluginsDirectory();
-      let pluginFiles = [];
+      const appPluginsDir = path.join(__dirname, '..', 'plugins'); // Built-in plugins
+      const userPluginsDir = this.getPluginsDirectory(); // User-installed plugins
 
+      const allPluginFiles = [];
+
+      // Read built-in plugins
       try {
-        pluginFiles = await fs.readdir(pluginsDir);
-      } catch {
-        // Directory doesn't exist or can't be read
-        return;
+        const builtInFiles = await fs.readdir(appPluginsDir);
+        allPluginFiles.push(...builtInFiles.map(file => path.join(appPluginsDir, file)));
+      } catch (e) {
+        this.logService.log(
+          `Warning: Built-in plugins directory not found or readable: ${e.message}`
+        );
       }
 
-      for (const file of pluginFiles) {
-        if (path.extname(file) === '.js') {
-          const pluginPath = path.join(pluginsDir, file);
+      // Read user-installed plugins
+      try {
+        const userFiles = await fs.readdir(userPluginsDir);
+        allPluginFiles.push(...userFiles.map(file => path.join(userPluginsDir, file)));
+      } catch (e) {
+        this.logService.log(`Warning: User plugins directory not found or readable: ${e.message}`);
+      }
+
+      for (const pluginPath of allPluginFiles) {
+        if (path.extname(pluginPath) === '.js') {
           try {
             const result = await this.loadPluginAsync(pluginPath);
             if (result.success) {
               this.logService.log(`Auto-loaded plugin: ${result.plugin?.name || 'Unknown'}`);
             } else {
-              this.logService.log(`Failed to auto-load plugin ${file}: ${result.errorMessage}`);
+              this.logService.log(
+                `Failed to auto-load plugin ${path.basename(pluginPath)}: ${result.errorMessage}`
+              );
             }
           } catch (error) {
-            this.logService.log(`Error auto-loading plugin ${file}: ${error.message}`);
+            this.logService.log(
+              `Error auto-loading plugin ${path.basename(pluginPath)}: ${error.message}`
+            );
           }
         }
       }

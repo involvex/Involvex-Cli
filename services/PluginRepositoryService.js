@@ -1,19 +1,12 @@
 const fs = require('fs').promises;
 const path = require('path');
-const os = require('os');
 
 class PluginRepositoryService {
   constructor(logService) {
     this.logService = logService;
     this.repositoryUrl =
       'https://raw.githubusercontent.com/involvex/Involvex-Cli/main/plugins-repository.json';
-    this.localRepositoryPath = path.join(
-      os.homedir(),
-      'AppData',
-      'Roaming',
-      'InvolveX',
-      'plugins-repository.json'
-    );
+    this.localRepositoryPath = path.join(__dirname, '..', 'plugins-repository.json');
   }
 
   async getAvailablePluginsAsync() {
