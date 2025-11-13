@@ -3831,10 +3831,7 @@ async function main() {
   // If no options or commands provided, or if npm start was used, start interactive TUI
   if ((!hasOptions && !hasCommand) || isNpmStart) {
     // Check if terminal is interactive
-    const forceInteractive =
-      process.env.FORCE_INTERACTIVE === 'true' ||
-      process.env.VSCODE_PID ||
-      process.platform === 'win32';
+    const forceInteractive = process.env.FORCE_INTERACTIVE === 'true' || !!process.env.VSCODE_PID;
 
     if (!forceInteractive && !isInteractiveTerminal()) {
       showNonInteractiveError();
