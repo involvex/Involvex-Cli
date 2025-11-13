@@ -32,6 +32,7 @@ jobs:
           mkdir -p docs
           cp README.md docs/
           cp index.html docs/
+          cp favicon.svg docs/ 2>/dev/null || true
           cp -r assets docs/ 2>/dev/null || true
 
       - name: Setup Pages

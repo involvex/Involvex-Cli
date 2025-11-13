@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Version constant
+const VERSION = '1.0.1';
+
 const blessed = require('blessed');
 const { Command } = require('commander');
 
@@ -57,7 +60,7 @@ async function checkForUpdates() {
           res.on('end', () => {
             try {
               const latestInfo = JSON.parse(data);
-              const currentVersion = '1.0.0';
+              const currentVersion = VERSION;
               const latestVersion = latestInfo.version;
 
               if (latestVersion > currentVersion) {
@@ -90,48 +93,23 @@ function isInteractiveTerminal() {
     return false;
   }
 
-  // Check if we're in CI/CD environment
+  // Check for CI/CD environment variables
   const ciVars = ['CI', 'CONTINUOUS_INTEGRATION', 'BUILD_NUMBER', 'TF_BUILD', 'GITHUB_ACTIONS'];
   if (ciVars.some(varName => process.env[varName])) {
     return false;
   }
 
-  // Check if we're in VS Code or similar IDE terminal
-  const term = process.env.TERM;
-  const termProgram = process.env.TERM_PROGRAM;
-  const wtSession = process.env.WT_SESSION; // Windows Terminal
-  const psModulePath = process.env.PSModulePath; // PowerShell
-
-  // More comprehensive checks for non-interactive environments
-  if (
-    term === 'dumb' ||
-    process.env.TMUX ||
-    process.env.SCREEN ||
-    process.env.CI ||
-    process.env.CONTINUOUS_INTEGRATION ||
-    process.env.GITHUB_ACTIONS
-  ) {
+  // Check for non-interactive terminal types
+  if (process.env.TERM === 'dumb' || process.env.TMUX || process.env.SCREEN) {
     return false;
   }
 
-  // Allow PowerShell and Windows Terminal as interactive, even in VS Code
-  if (psModulePath || wtSession || termProgram?.toLowerCase().includes('powershell')) {
-    return true;
-  }
-
-  // For Windows, be very permissive - allow all terminals with TTY
+  // On Windows, be permissive - allow all terminals with TTY
   if (process.platform === 'win32') {
-    // On Windows, if we have TTY, assume interactive
-    // This includes VS Code integrated terminal, Command Prompt, PowerShell, etc.
     return true;
   }
 
-  // For other platforms, check for VS Code but allow it if TTY is present
-  if (termProgram?.toLowerCase().includes('vscode') || process.env.VSCODE_PID) {
-    // Allow VS Code on non-Windows platforms if TTY is present
-    return true;
-  }
-
+  // For other platforms, allow if TTY is present
   return true;
 }
 
@@ -186,7 +164,7 @@ For more information, visit: https://github.com/involvex/Involvex-Cli
 
 // Show version information
 function showVersion() {
-  console.log('InvolveX CLI v1.0.0');
+  console.log(`InvolveX CLI v${VERSION}`);
   console.log('Windows System Administration Toolkit');
   console.log('Built with Node.js');
 }
@@ -474,6 +452,7 @@ async function showUpdateMenu(screen) {
       'Update NPM',
       'Update Scoop',
       'Update Chocolatey',
+      'Update Pip',
       'Update PowerShell Modules',
       'Update All',
       'Back',
@@ -508,6 +487,10 @@ async function showUpdateMenu(screen) {
         }
         case 'Update Chocolatey': {
           await runPackageUpdate(screen, 'choco', () => packageManagerService.updateChoco());
+          break;
+        }
+        case 'Update Pip': {
+          await runPackageUpdate(screen, 'pip', () => packageManagerService.updatePip());
           break;
         }
         case 'Update PowerShell Modules': {
@@ -1043,11 +1026,30 @@ async function showAvailableUpdates(screen) {
   });
 
   screen.append(progressDialog);
-  progressDialog.load('Scanning package managers for updates...');
-  screen.render();
+
+  // Animated loading messages
+  const loadingMessages = [
+    'Scanning package managers for updates...',
+    'Checking Winget packages...',
+    'Checking NPM packages...',
+    'Checking Scoop packages...',
+    'Checking Chocolatey packages...',
+    'Checking Pip packages...',
+    'Analyzing update information...',
+  ];
+
+  let messageIndex = 0;
+  const messageInterval = setInterval(() => {
+    if (messageIndex < loadingMessages.length) {
+      progressDialog.load(loadingMessages[messageIndex]);
+      screen.render();
+      messageIndex++;
+    }
+  }, 800);
 
   try {
     const updates = await packageManagerService.getAvailableUpdatesAsync();
+    clearInterval(messageInterval);
 
     progressDialog.stop();
     progressDialog.destroy();
@@ -1074,6 +1076,7 @@ async function showAvailableUpdates(screen) {
       );
     }
   } catch (error) {
+    clearInterval(messageInterval);
     progressDialog.stop();
     progressDialog.destroy();
     screen.render();
@@ -1099,15 +1102,66 @@ async function runPackageUpdate(screen, managerName, updateFunction) {
   });
 
   screen.append(progressDialog);
-  progressDialog.load(`Updating ${managerName}, please wait...`);
-  screen.render();
+
+  // Animated loading messages
+  const loadingMessages = [
+    `Initializing ${managerName} update...`,
+    `Connecting to ${managerName} repository...`,
+    `Downloading package information...`,
+    `Installing updates...`,
+    `Finalizing ${managerName} update...`,
+  ];
+
+  let messageIndex = 0;
+  const messageInterval = setInterval(() => {
+    if (messageIndex < loadingMessages.length) {
+      progressDialog.load(loadingMessages[messageIndex]);
+      screen.render();
+      messageIndex++;
+    }
+  }, 1000);
 
   try {
     await updateFunction();
+    clearInterval(messageInterval);
     progressDialog.stop();
     progressDialog.destroy();
-    showMessage(screen, 'Success', `${managerName} update completed successfully!`);
+
+    // Success animation
+    const successDialog = blessed.box({
+      top: 'center',
+      left: 'center',
+      width: '40%',
+      height: '15%',
+      border: {
+        type: 'line',
+      },
+      label: ' Success ',
+      content: `\n${managerName} update completed successfully!\n\nPress any key to continue...`,
+      style: {
+        border: {
+          fg: 'green',
+        },
+        fg: 'green',
+      },
+    });
+
+    screen.append(successDialog);
+    screen.render();
+
+    // Auto-close after 2 seconds
+    setTimeout(() => {
+      successDialog.destroy();
+      screen.render();
+    }, 2000);
+
+    successDialog.key(['enter', 'escape', 'space'], () => {
+      successDialog.destroy();
+      screen.render();
+    });
+    successDialog.focus();
   } catch (error) {
+    clearInterval(messageInterval);
     progressDialog.stop();
     progressDialog.destroy();
     showMessage(screen, 'Error', `Failed to update ${managerName}: ${error.message}`);
@@ -1132,23 +1186,34 @@ async function runUpdateAll(screen) {
   });
 
   screen.append(progressDialog);
-  progressDialog.load('Updating all package managers...');
-  screen.render();
+
+  // Animated loading message
+  let loadingDots = 0;
+  const loadingInterval = setInterval(() => {
+    const dots = '.'.repeat((loadingDots % 4) + 1);
+    progressDialog.load(`Updating all package managers${dots}`);
+    screen.render();
+    loadingDots++;
+  }, 300);
 
   try {
     // Check which managers are available
-    const [winget, npm, scoop, choco] = await Promise.all([
+    const [winget, npm, scoop, choco, pip] = await Promise.all([
       packageManagerService.isWingetInstalled(),
       packageManagerService.isNpmInstalled(),
       packageManagerService.isScoopInstalled(),
       packageManagerService.isChocoInstalled(),
+      packageManagerService.isPipInstalled(),
     ]);
+
+    clearInterval(loadingInterval);
 
     const availableManagers = [];
     if (winget) availableManagers.push('winget');
     if (npm) availableManagers.push('npm');
     if (scoop) availableManagers.push('scoop');
     if (choco) availableManagers.push('choco');
+    if (pip) availableManagers.push('pip');
 
     if (availableManagers.length === 0) {
       progressDialog.stop();
@@ -1163,8 +1228,12 @@ async function runUpdateAll(screen) {
 
     // Update all managers
     const results = [];
-    for (const manager of availableManagers) {
-      progressDialog.load(`Updating ${manager}...`);
+    for (let i = 0; i < availableManagers.length; i++) {
+      const manager = availableManagers[i];
+      const progress = Math.round(((i + 1) / availableManagers.length) * 100);
+      progressDialog.load(
+        `Updating ${manager}... (${i + 1}/${availableManagers.length}) [${progress}%]`
+      );
       screen.render();
 
       try {
@@ -1185,6 +1254,10 @@ async function runUpdateAll(screen) {
             await packageManagerService.updateChoco();
             break;
           }
+          case 'pip': {
+            await packageManagerService.updatePip();
+            break;
+          }
         }
         results.push(`${manager}: Success`);
       } catch (error) {
@@ -1193,7 +1266,7 @@ async function runUpdateAll(screen) {
     }
 
     // Update PowerShell modules
-    progressDialog.load('Updating PowerShell modules...');
+    progressDialog.load('Updating PowerShell modules... [Finalizing]');
     screen.render();
 
     try {
@@ -1203,12 +1276,14 @@ async function runUpdateAll(screen) {
       results.push(`PowerShell Modules: Failed - ${error.message}`);
     }
 
+    clearInterval(loadingInterval);
     progressDialog.stop();
     progressDialog.destroy();
 
     const resultText = results.join('\n');
     showMessage(screen, 'Update Results', `Update Complete!\n\n${resultText}`);
   } catch (error) {
+    if (loadingInterval) clearInterval(loadingInterval);
     progressDialog.stop();
     progressDialog.destroy();
     showMessage(screen, 'Error', `Update process failed: ${error.message}`);
@@ -1968,7 +2043,7 @@ async function main() {
   program
     .name('involvex-cli')
     .description('Windows System Administration Toolkit')
-    .version('1.0.0')
+    .version(VERSION)
     .option('--help', 'Show help information')
     .option('--version', 'Show version information')
     .option('--update', 'Update package managers and packages')

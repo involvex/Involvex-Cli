@@ -23,6 +23,30 @@ class PackageManagerService extends EventEmitter {
     return await this.isCommandInstalled('choco');
   }
 
+  async isPipInstalled() {
+    // Check for pip, pip3, or python -m pip
+    const pipCommands = ['pip', 'pip3', 'python -m pip', 'python3 -m pip'];
+    for (const cmd of pipCommands) {
+      const parts = cmd.split(' ');
+      try {
+        if (parts.length > 1) {
+          // For 'python -m pip', check if python is available
+          const pythonResult = await this.runProcess(parts[0], ['--version'], 5000);
+          if (pythonResult.code === 0) {
+            const pipResult = await this.runProcess(parts[0], ['-m', 'pip', '--version'], 5000);
+            if (pipResult.code === 0) return true;
+          }
+        } else {
+          const result = await this.runProcess('where', [cmd], 5000);
+          if (result.code === 0) return true;
+        }
+      } catch {
+        // Continue to next command
+      }
+    }
+    return false;
+  }
+
   async updateWinget() {
     return await this.runUpdateCommand('winget', ['update', '--include-unknown']);
   }
@@ -37,6 +61,74 @@ class PackageManagerService extends EventEmitter {
 
   async updateChoco() {
     return await this.runUpdateCommand('choco', ['upgrade', 'all', '-y']);
+  }
+
+  async updatePip() {
+    // Try pip, pip3, or python -m pip
+    const pipCommands = [
+      { cmd: 'pip', args: ['install', '--upgrade', 'pip'] },
+      { cmd: 'pip3', args: ['install', '--upgrade', 'pip'] },
+      { cmd: 'python', args: ['-m', 'pip', 'install', '--upgrade', 'pip'] },
+      { cmd: 'python3', args: ['-m', 'pip', 'install', '--upgrade', 'pip'] },
+    ];
+
+    for (const { cmd, args } of pipCommands) {
+      try {
+        // Check if this pip command is available
+        let checkArgs;
+        if (cmd === 'pip' || cmd === 'pip3') {
+          checkArgs = ['--version'];
+        } else {
+          checkArgs = ['-m', 'pip', '--version'];
+        }
+        const result = await this.runProcess(cmd, checkArgs, 5000);
+        if (result.code === 0) {
+          // This command is available, update pip itself first
+          await this.runUpdateCommand(cmd, args);
+          // Then update all outdated packages using pip-review or manual list
+          const listArgs =
+            cmd === 'pip' || cmd === 'pip3'
+              ? ['list', '--outdated']
+              : ['-m', 'pip', 'list', '--outdated'];
+
+          const listResult = await this.runProcess(cmd, listArgs, 30000);
+          if (listResult.code === 0 && listResult.stdout) {
+            const lines = listResult.stdout.split('\n');
+            const packages = [];
+
+            for (let i = 2; i < lines.length; i++) {
+              const line = lines[i].trim();
+              if (line && !line.includes('Package') && !line.includes('---')) {
+                const parts = line.split(/\s+/).filter(part => part.length > 0);
+                if (parts.length > 0) {
+                  packages.push(parts[0]);
+                }
+              }
+            }
+
+            if (packages.length > 0) {
+              // Update packages one by one
+              for (const pkg of packages) {
+                const updateArgs =
+                  cmd === 'pip' || cmd === 'pip3'
+                    ? ['install', '--upgrade', pkg]
+                    : ['-m', 'pip', 'install', '--upgrade', pkg];
+                try {
+                  await this.runUpdateCommand(cmd, updateArgs);
+                } catch (error) {
+                  this.logService.log(`Failed to update ${pkg}: ${error.message}`);
+                }
+              }
+            }
+          }
+          return;
+        }
+      } catch (error) {
+        // Continue to next command
+        this.logService.log(`Trying next pip command: ${error.message}`);
+      }
+    }
+    throw new Error('No pip installation found');
   }
 
   async updateSpecificProgramWithWinget(programName) {
@@ -98,7 +190,7 @@ class PackageManagerService extends EventEmitter {
     }
   }
 
-  async runProcess(command, args) {
+  async runProcess(command, args, timeoutMs = 30000) {
     return new Promise((resolve, reject) => {
       const process = spawn(command, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -107,6 +199,19 @@ class PackageManagerService extends EventEmitter {
 
       let stdout = '';
       let stderr = '';
+      let timeoutId = null;
+
+      // Set timeout
+      if (timeoutMs > 0) {
+        timeoutId = setTimeout(() => {
+          try {
+            process.kill();
+          } catch {
+            // Ignore kill errors
+          }
+          reject(new Error(`Process timeout after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }
 
       process.stdout.on('data', data => {
         stdout += data.toString();
@@ -117,6 +222,9 @@ class PackageManagerService extends EventEmitter {
       });
 
       process.on('close', code => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
         this.logService.log(`[${command} STDOUT]: ${stdout}`);
         this.logService.log(`[${command} STDERR]: ${stderr}`);
 
@@ -128,6 +236,9 @@ class PackageManagerService extends EventEmitter {
       });
 
       process.on('error', error => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
         reject(error);
       });
     });
@@ -135,11 +246,20 @@ class PackageManagerService extends EventEmitter {
 
   async getAvailableUpdatesAsync() {
     const availableUpdates = [];
+    const timeoutMs = 15000; // 15 second timeout per package manager
 
     // Check winget updates
     if (await this.isWingetInstalled()) {
       try {
-        const wingetUpdates = await this.getWingetAvailableUpdatesAsync();
+        const wingetUpdates = await Promise.race([
+          this.getWingetAvailableUpdatesAsync(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Winget update check timeout')), timeoutMs)
+          ),
+        ]).catch(error => {
+          this.logService.log(`Error getting winget updates: ${error.message}`);
+          return null;
+        });
         if (wingetUpdates) {
           availableUpdates.push(...wingetUpdates);
         }
@@ -151,7 +271,15 @@ class PackageManagerService extends EventEmitter {
     // Check npm updates
     if (await this.isNpmInstalled()) {
       try {
-        const npmUpdates = await this.getNpmAvailableUpdatesAsync();
+        const npmUpdates = await Promise.race([
+          this.getNpmAvailableUpdatesAsync(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('NPM update check timeout')), timeoutMs)
+          ),
+        ]).catch(error => {
+          this.logService.log(`Error getting npm updates: ${error.message}`);
+          return null;
+        });
         if (npmUpdates) {
           availableUpdates.push(...npmUpdates);
         }
@@ -163,7 +291,15 @@ class PackageManagerService extends EventEmitter {
     // Check scoop updates
     if (await this.isScoopInstalled()) {
       try {
-        const scoopUpdates = await this.getScoopAvailableUpdatesAsync();
+        const scoopUpdates = await Promise.race([
+          this.getScoopAvailableUpdatesAsync(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Scoop update check timeout')), timeoutMs)
+          ),
+        ]).catch(error => {
+          this.logService.log(`Error getting scoop updates: ${error.message}`);
+          return null;
+        });
         if (scoopUpdates) {
           availableUpdates.push(...scoopUpdates);
         }
@@ -175,12 +311,40 @@ class PackageManagerService extends EventEmitter {
     // Check choco updates
     if (await this.isChocoInstalled()) {
       try {
-        const chocoUpdates = await this.getChocoAvailableUpdatesAsync();
+        const chocoUpdates = await Promise.race([
+          this.getChocoAvailableUpdatesAsync(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Choco update check timeout')), timeoutMs)
+          ),
+        ]).catch(error => {
+          this.logService.log(`Error getting choco updates: ${error.message}`);
+          return null;
+        });
         if (chocoUpdates) {
           availableUpdates.push(...chocoUpdates);
         }
       } catch (error) {
         this.logService.log(`Error getting choco updates: ${error.message}`);
+      }
+    }
+
+    // Check pip updates
+    if (await this.isPipInstalled()) {
+      try {
+        const pipUpdates = await Promise.race([
+          this.getPipAvailableUpdatesAsync(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Pip update check timeout')), timeoutMs)
+          ),
+        ]).catch(error => {
+          this.logService.log(`Error getting pip updates: ${error.message}`);
+          return null;
+        });
+        if (pipUpdates) {
+          availableUpdates.push(...pipUpdates);
+        }
+      } catch (error) {
+        this.logService.log(`Error getting pip updates: ${error.message}`);
       }
     }
 
@@ -359,6 +523,62 @@ class PackageManagerService extends EventEmitter {
       return updates;
     } catch (error) {
       this.logService.log(`Error getting choco available updates: ${error.message}`);
+      return null;
+    }
+  }
+
+  async getPipAvailableUpdatesAsync() {
+    try {
+      // Try different pip commands
+      const pipCommands = [
+        { cmd: 'pip', args: ['list', '--outdated', '--format=json'] },
+        { cmd: 'pip3', args: ['list', '--outdated', '--format=json'] },
+        { cmd: 'python', args: ['-m', 'pip', 'list', '--outdated', '--format=json'] },
+        { cmd: 'python3', args: ['-m', 'pip', 'list', '--outdated', '--format=json'] },
+      ];
+
+      for (const { cmd, args } of pipCommands) {
+        try {
+          const result = await this.runProcess(cmd, args, 15000);
+          if (result.code === 0 && result.stdout) {
+            try {
+              const packages = JSON.parse(result.stdout);
+              const updates = packages.map(pkg => ({
+                packageManager: 'pip',
+                packageName: pkg.name,
+                currentVersion: pkg.version || 'Unknown',
+                availableVersion: pkg.latest_version || 'Unknown',
+              }));
+              return updates;
+            } catch {
+              // If JSON parsing fails, try text parsing
+              const lines = result.stdout.split('\n');
+              const updates = [];
+              for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line && !line.includes('Package') && !line.includes('---')) {
+                  const parts = line.split(/\s+/).filter(part => part.length > 0);
+                  if (parts.length >= 3) {
+                    updates.push({
+                      packageManager: 'pip',
+                      packageName: parts[0],
+                      currentVersion: parts[1],
+                      availableVersion: parts[2],
+                    });
+                  }
+                }
+              }
+              return updates.length > 0 ? updates : null;
+            }
+          }
+        } catch (error) {
+          // Continue to next command
+          this.logService.log(`Trying next pip command: ${error.message}`);
+        }
+      }
+      return null;
+    } catch (error) {
+      this.logService.log(`Error getting pip available updates: ${error.message}`);
       return null;
     }
   }
