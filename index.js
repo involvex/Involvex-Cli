@@ -3605,6 +3605,10 @@ async function main() {
   const hasOptions = filteredOptions.length > 0;
   const hasCommand = program.args.length > 0 && program.args[0] !== 'help';
 
+  // Force interactive mode if npm start is detected
+  const isNpmStart =
+    process.env.npm_lifecycle_event === 'start' || process.env.npm_command === 'start';
+
   // Handle command line arguments
   if (options.help) {
     showHelp();
@@ -3828,8 +3832,8 @@ async function main() {
     return;
   }
 
-  // If no options or commands provided, start interactive TUI
-  if (!hasOptions && !hasCommand) {
+  // If no options or commands provided, or if npm start was used, start interactive TUI
+  if ((!hasOptions && !hasCommand) || isNpmStart) {
     // Check if terminal is interactive
     const forceInteractive =
       process.env.FORCE_INTERACTIVE === 'true' ||
