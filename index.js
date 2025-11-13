@@ -3541,7 +3541,8 @@ async function main() {
   let suppressOutput = false;
 
   process.exit = code => {
-    // Don't prevent exit if serve is running - let it handle its own lifecycle
+    // Don't prevent exit if serve is running or help is explicitly requested
+    // Also allow exit if no arguments provided (we'll start interactive mode)
     if (
       code === 0 &&
       !process.argv.includes('--help') &&
@@ -3549,6 +3550,7 @@ async function main() {
       !process.argv.includes('--serve')
     ) {
       // Commander wants to exit, but we'll handle it ourselves
+      // This allows us to start interactive mode when no args provided
       return;
     }
     originalExit(code);
@@ -3578,12 +3580,19 @@ async function main() {
     }
     // Note: We keep process.exit override for serve to prevent premature exit
     // It will be restored in the serve handler after server starts
+    // For interactive mode, we also keep it to prevent commander from exiting
   }
 
   const options = program.opts();
 
   // Check if any command or option was provided
-  const hasOptions = Object.keys(options).length > 0;
+  // Filter out default/empty options that commander might set
+  const filteredOptions = Object.keys(options).filter(key => {
+    const value = options[key];
+    // Exclude undefined, null, empty strings, and false boolean flags
+    return value !== undefined && value !== null && value !== '' && value !== false;
+  });
+  const hasOptions = filteredOptions.length > 0;
   const hasCommand = program.args.length > 0 && program.args[0] !== 'help';
 
   // Handle command line arguments
@@ -3837,6 +3846,10 @@ async function main() {
     } catch {
       // Silently ignore update check errors
     }
+
+    // Restore process.exit now that we're starting interactive mode
+    // The TUI will keep the event loop alive
+    process.exit = originalExit;
 
     // Start TUI
     try {
