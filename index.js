@@ -3558,10 +3558,13 @@ async function main() {
 
   // Temporarily suppress output during parsing if not explicitly requesting help
   // But don't suppress if serve is being used (we want to see server messages)
+  // Also don't suppress if no arguments (we want to see TUI startup)
+  const hasNoArgs = process.argv.length === 2; // Only 'node' and 'index.js'
   if (
     !process.argv.includes('--help') &&
     !process.argv.includes('-h') &&
-    !process.argv.includes('--serve')
+    !process.argv.includes('--serve') &&
+    !hasNoArgs
   ) {
     suppressOutput = true;
     process.stdout.write = () => true;
@@ -3578,9 +3581,8 @@ async function main() {
       process.stdout.write = originalWrite;
       process.stderr.write = originalErrWrite;
     }
-    // Note: We keep process.exit override for serve to prevent premature exit
-    // It will be restored in the serve handler after server starts
-    // For interactive mode, we also keep it to prevent commander from exiting
+    // Note: We keep process.exit override for serve and interactive mode
+    // It will be restored in the respective handlers after they start
   }
 
   const options = program.opts();
