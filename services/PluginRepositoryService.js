@@ -50,7 +50,8 @@ class PluginRepositoryService {
 
           response.on('end', () => {
             try {
-              const plugins = JSON.parse(data);
+              const trimmedData = data.trim();
+              const plugins = JSON.parse(trimmedData);
               resolve(plugins);
             } catch (parseError) {
               this.logService.log(`Error parsing remote repository: ${parseError.message}`);
@@ -79,10 +80,13 @@ class PluginRepositoryService {
   async loadLocalRepositoryAsync() {
     try {
       const data = await fs.readFile(this.localRepositoryPath, 'utf8');
+
       const plugins = JSON.parse(data);
+
       return plugins;
     } catch {
       // File doesn't exist or is invalid
+
       return null;
     }
   }

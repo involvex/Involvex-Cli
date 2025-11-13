@@ -1,0 +1,88 @@
+{
+  "plugins": [
+    {
+      "name": "winget-updater",
+      "description": "Updates applications using Winget.",
+      "command": "winget upgrade --all --no-include-unknown",
+      "args": [],
+      "platforms": ["windows"]
+    },
+    {
+      "name": "npm-updater",
+      "description": "Updates global npm packages.",
+      "command": "npm update -g",
+      "args": [],
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "name": "scoop-updater",
+      "description": "Updates applications using Scoop.",
+      "command": "scoop update *",
+      "args": [],
+      "platforms": ["windows"]
+    },
+    {
+      "name": "choco-updater",
+      "description": "Updates applications using Chocolatey.",
+      "command": "choco upgrade all -y",
+      "args": [],
+      "platforms": ["windows"]
+    },
+    {
+      "name": "powershell-module-updater",
+      "description": "Updates PowerShell modules.",
+      "command": "Update-Module -Force",
+      "args": [],
+      "platforms": ["windows"]
+    },
+    {
+      "name": "powershell-resource-updater",
+      "description": "Updates PowerShell resources.",
+      "command": "Update-PSResource",
+      "args": [],
+      "platforms": ["windows"]
+    },
+    {
+      "name": "system-restore-point",
+      "description": "Creates a system restore point (Windows only).",
+      "command": "powershell -Command \"Checkpoint-Computer -Description 'Involvex-Cli Restore Point'\"",
+      "args": [],
+      "platforms": ["windows"]
+    },
+    {
+      "name": "clear-temp-files",
+      "description": "Clears temporary files.",
+      "command": "powershell -Command \"Get-ChildItem -Path $env:TEMP -Recurse -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue\"",
+      "args": [],
+      "platforms": ["windows"]
+    },
+    {
+      "name": "clear-dns-cache",
+      "description": "Clears the DNS resolver cache.",
+      "command": "ipconfig /flushdns",
+      "args": [],
+      "platforms": ["windows"]
+    },
+    {
+      "name": "set-dns-1.1.1.1",
+      "description": "Sets DNS to Cloudflare (1.1.1.1 and 1.0.0.1).",
+      "command": "powershell -Command \"Get-NetAdapter | ForEach-Object { Set-DnsClientServerAddress -InterfaceAlias $_.Name -ServerAddresses ('1.1.1.1', '1.0.0.1') }\"",
+      "args": [],
+      "platforms": ["windows"]
+    },
+    {
+      "name": "ping-test",
+      "description": "Performs a ping test to a specified host.",
+      "command": "ping",
+      "args": ["host"],
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "name": "speed-test",
+      "description": "Performs an internet speed test.",
+      "command": "speedtest-cli",
+      "args": [],
+      "platforms": ["windows", "linux", "macos"]
+    }
+  ]
+}
