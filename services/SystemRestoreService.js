@@ -1,15 +1,15 @@
 const { spawn } = require('child_process');
 
 class SystemRestoreService {
-    constructor(logService) {
-        this.logService = logService;
-    }
+  constructor(logService) {
+    this.logService = logService;
+  }
 
-    async createRestorePoint(description) {
-        try {
-            this.logService.log(`Creating system restore point: ${description}`);
+  async createRestorePoint(description) {
+    try {
+      this.logService.log(`Creating system restore point: ${description}`);
 
-            const psScript = `
+      const psScript = `
                 # Create a system restore point
                 try {
                     $description = "${description}"
@@ -28,26 +28,26 @@ class SystemRestoreService {
                 }
             `;
 
-            const result = await this.runProcess('powershell', ['-Command', psScript]);
+      const result = await this.runProcess('powershell', ['-Command', psScript]);
 
-            if (result.stdout.includes('SUCCESS')) {
-                this.logService.log('System restore point created successfully');
-                return true;
-            } else {
-                this.logService.log(`Failed to create restore point: ${result.stdout}`);
-                return false;
-            }
-        } catch (error) {
-            this.logService.log(`Error creating restore point: ${error.message}`);
-            return false;
-        }
+      if (result.stdout.includes('SUCCESS')) {
+        this.logService.log('System restore point created successfully');
+        return true;
+      } else {
+        this.logService.log(`Failed to create restore point: ${result.stdout}`);
+        return false;
+      }
+    } catch (error) {
+      this.logService.log(`Error creating restore point: ${error.message}`);
+      return false;
     }
+  }
 
-    async listRestorePoints() {
-        try {
-            this.logService.log('Listing system restore points');
+  async listRestorePoints() {
+    try {
+      this.logService.log('Listing system restore points');
 
-            const psScript = `
+      const psScript = `
                 try {
                     $restorePoints = Get-ComputerRestorePoint | Sort-Object -Property CreationTime -Descending
                     if ($restorePoints.Count -eq 0) {
@@ -62,19 +62,19 @@ class SystemRestoreService {
                 }
             `;
 
-            const result = await this.runProcess('powershell', ['-Command', psScript]);
-            return result.stdout.trim();
-        } catch (error) {
-            this.logService.log(`Error listing restore points: ${error.message}`);
-            return `Error: ${error.message}`;
-        }
+      const result = await this.runProcess('powershell', ['-Command', psScript]);
+      return result.stdout.trim();
+    } catch (error) {
+      this.logService.log(`Error listing restore points: ${error.message}`);
+      return `Error: ${error.message}`;
     }
+  }
 
-    async deleteRestorePoint(sequenceNumber) {
-        try {
-            this.logService.log(`Deleting restore point with sequence: ${sequenceNumber}`);
+  async deleteRestorePoint(sequenceNumber) {
+    try {
+      this.logService.log(`Deleting restore point with sequence: ${sequenceNumber}`);
 
-            const psScript = `
+      const psScript = `
                 try {
                     $sequence = ${sequenceNumber}
                     $restorePoint = Get-ComputerRestorePoint | Where-Object { $_.SequenceNumber -eq $sequence }
@@ -94,29 +94,29 @@ class SystemRestoreService {
                 }
             `;
 
-            const result = await this.runProcess('powershell', ['-Command', psScript]);
+      const result = await this.runProcess('powershell', ['-Command', psScript]);
 
-            if (result.stdout.includes('NOT_FOUND')) {
-                this.logService.log('Restore point not found');
-                return false;
-            } else if (result.stdout.includes('DELETE_NOT_SUPPORTED')) {
-                this.logService.log('Individual restore point deletion not supported');
-                return false;
-            } else {
-                this.logService.log('Restore point deleted successfully');
-                return true;
-            }
-        } catch (error) {
-            this.logService.log(`Error deleting restore point: ${error.message}`);
-            return false;
-        }
+      if (result.stdout.includes('NOT_FOUND')) {
+        this.logService.log('Restore point not found');
+        return false;
+      } else if (result.stdout.includes('DELETE_NOT_SUPPORTED')) {
+        this.logService.log('Individual restore point deletion not supported');
+        return false;
+      } else {
+        this.logService.log('Restore point deleted successfully');
+        return true;
+      }
+    } catch (error) {
+      this.logService.log(`Error deleting restore point: ${error.message}`);
+      return false;
     }
+  }
 
-    async deleteOldRestorePoints(keepCount) {
-        try {
-            this.logService.log(`Deleting old restore points, keeping ${keepCount} most recent`);
+  async deleteOldRestorePoints(keepCount) {
+    try {
+      this.logService.log(`Deleting old restore points, keeping ${keepCount} most recent`);
 
-            const psScript = `
+      const psScript = `
                 try {
                     $keepCount = ${keepCount}
                     $restorePoints = Get-ComputerRestorePoint | Sort-Object -Property CreationTime -Descending
@@ -136,55 +136,55 @@ class SystemRestoreService {
                 }
             `;
 
-            const result = await this.runProcess('powershell', ['-Command', psScript]);
+      const result = await this.runProcess('powershell', ['-Command', psScript]);
 
-            if (result.stdout.includes('No old restore points')) {
-                this.logService.log('No old restore points to delete');
-                return true;
-            } else if (result.stdout.includes('DELETE_OLD_NOT_SUPPORTED')) {
-                this.logService.log('Deleting old restore points not supported in this implementation');
-                return false;
-            } else {
-                this.logService.log('Old restore points deleted successfully');
-                return true;
-            }
-        } catch (error) {
-            this.logService.log(`Error deleting old restore points: ${error.message}`);
-            return false;
-        }
+      if (result.stdout.includes('No old restore points')) {
+        this.logService.log('No old restore points to delete');
+        return true;
+      } else if (result.stdout.includes('DELETE_OLD_NOT_SUPPORTED')) {
+        this.logService.log('Deleting old restore points not supported in this implementation');
+        return false;
+      } else {
+        this.logService.log('Old restore points deleted successfully');
+        return true;
+      }
+    } catch (error) {
+      this.logService.log(`Error deleting old restore points: ${error.message}`);
+      return false;
     }
+  }
 
-    async runProcess(command, args) {
-        return new Promise((resolve, reject) => {
-            const process = spawn(command, args, {
-                stdio: ['pipe', 'pipe', 'pipe'],
-                shell: true
-            });
+  async runProcess(command, args) {
+    return new Promise((resolve, reject) => {
+      const process = spawn(command, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: true,
+      });
 
-            let stdout = '';
-            let stderr = '';
+      let stdout = '';
+      let stderr = '';
 
-            process.stdout.on('data', (data) => {
-                stdout += data.toString();
-            });
+      process.stdout.on('data', data => {
+        stdout += data.toString();
+      });
 
-            process.stderr.on('data', (data) => {
-                stderr += data.toString();
-            });
+      process.stderr.on('data', data => {
+        stderr += data.toString();
+      });
 
-            process.on('close', (code) => {
-                resolve({
-                    code,
-                    stdout,
-                    stderr
-                });
-            });
-
-            process.on('error', (error) => {
-                reject(error);
-            });
+      process.on('close', code => {
+        resolve({
+          code,
+          stdout,
+          stderr,
         });
-    }
+      });
+
+      process.on('error', error => {
+        reject(error);
+      });
+    });
+  }
 }
 
 module.exports = SystemRestoreService;

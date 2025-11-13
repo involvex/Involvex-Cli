@@ -35,7 +35,10 @@ describe('LogService', () => {
     logService.log(testMessage);
 
     // Check if log file exists
-    const exists = await fs.access(logFilePath).then(() => true).catch(() => false);
+    const exists = await fs
+      .access(logFilePath)
+      .then(() => true)
+      .catch(() => false);
     expect(exists).toBe(true);
   });
 

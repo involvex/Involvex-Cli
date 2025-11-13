@@ -1,17 +1,17 @@
 const { spawn } = require('child_process');
 
 class StartupService {
-    constructor(logService) {
-        this.logService = logService;
-    }
+  constructor(logService) {
+    this.logService = logService;
+  }
 
-    async listStartupPrograms() {
-        this.logService.log("Listing startup programs from registry and Task Scheduler.");
-        const startupPrograms = [];
+  async listStartupPrograms() {
+    this.logService.log('Listing startup programs from registry and Task Scheduler.');
+    const startupPrograms = [];
 
-        try {
-            // Check registry Run keys using PowerShell
-            const psScript = `
+    try {
+      // Check registry Run keys using PowerShell
+      const psScript = `
                 # Get registry startup programs
                 $runKeys = @(
                     "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
@@ -58,28 +58,28 @@ class StartupService {
                 }
             `;
 
-            const result = await this.runProcess('powershell', ['-Command', psScript]);
+      const result = await this.runProcess('powershell', ['-Command', psScript]);
 
-            if (result.code === 0) {
-                const lines = result.stdout.split('\n').filter(line => line.trim());
-                startupPrograms.push(...lines);
-            }
+      if (result.code === 0) {
+        const lines = result.stdout.split('\n').filter(line => line.trim());
+        startupPrograms.push(...lines);
+      }
 
-            this.logService.log(`Found ${startupPrograms.length} startup programs.`);
-        } catch (error) {
-            this.logService.log(`Exception listing startup programs: ${error.message}`);
-            startupPrograms.push(`Error: ${error.message}`);
-        }
-
-        return startupPrograms;
+      this.logService.log(`Found ${startupPrograms.length} startup programs.`);
+    } catch (error) {
+      this.logService.log(`Exception listing startup programs: ${error.message}`);
+      startupPrograms.push(`Error: ${error.message}`);
     }
 
-    async disableStartupProgram(programName) {
-        this.logService.log(`Attempting to disable startup program: ${programName}`);
+    return startupPrograms;
+  }
 
-        try {
-            // Try to disable from registry first
-            const psScript = `
+  async disableStartupProgram(programName) {
+    this.logService.log(`Attempting to disable startup program: ${programName}`);
+
+    try {
+      // Try to disable from registry first
+      const psScript = `
                 $programName = "${programName}"
                 $found = $false
 
@@ -129,52 +129,54 @@ class StartupService {
                 }
             `;
 
-            const result = await this.runProcess('powershell', ['-Command', psScript]);
+      const result = await this.runProcess('powershell', ['-Command', psScript]);
 
-            if (result.code === 0 && result.stdout.includes('SUCCESS')) {
-                this.logService.log(`Successfully disabled startup program: ${programName}`);
-                return true;
-            } else {
-                this.logService.log(`Could not automatically disable: ${programName}. Manual intervention may be required.`);
-                return false;
-            }
-        } catch (error) {
-            this.logService.log(`Exception disabling startup program ${programName}: ${error.message}`);
-            return false;
-        }
+      if (result.code === 0 && result.stdout.includes('SUCCESS')) {
+        this.logService.log(`Successfully disabled startup program: ${programName}`);
+        return true;
+      } else {
+        this.logService.log(
+          `Could not automatically disable: ${programName}. Manual intervention may be required.`
+        );
+        return false;
+      }
+    } catch (error) {
+      this.logService.log(`Exception disabling startup program ${programName}: ${error.message}`);
+      return false;
     }
+  }
 
-    async runProcess(command, args) {
-        return new Promise((resolve, reject) => {
-            const process = spawn(command, args, {
-                stdio: ['pipe', 'pipe', 'pipe'],
-                shell: true
-            });
+  async runProcess(command, args) {
+    return new Promise((resolve, reject) => {
+      const process = spawn(command, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: true,
+      });
 
-            let stdout = '';
-            let stderr = '';
+      let stdout = '';
+      let stderr = '';
 
-            process.stdout.on('data', (data) => {
-                stdout += data.toString();
-            });
+      process.stdout.on('data', data => {
+        stdout += data.toString();
+      });
 
-            process.stderr.on('data', (data) => {
-                stderr += data.toString();
-            });
+      process.stderr.on('data', data => {
+        stderr += data.toString();
+      });
 
-            process.on('close', (code) => {
-                resolve({
-                    code,
-                    stdout,
-                    stderr
-                });
-            });
-
-            process.on('error', (error) => {
-                reject(error);
-            });
+      process.on('close', code => {
+        resolve({
+          code,
+          stdout,
+          stderr,
         });
-    }
+      });
+
+      process.on('error', error => {
+        reject(error);
+      });
+    });
+  }
 }
 
 module.exports = StartupService;

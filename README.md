@@ -5,28 +5,33 @@ A comprehensive Windows system administration toolkit built with Node.js, provid
 ## Features
 
 ### Package Management
+
 - Update Winget, NPM, Scoop, Chocolatey packages
 - Check for available updates across all package managers
 - Update PowerShell modules
 - Bulk update operations
 
 ### System Maintenance
+
 - Clear system caches and temporary files
 - Memory optimization and cleanup
 - Startup program management
 - Program uninstallation
 
 ### Network Tools
+
 - Ping tests with customizable hosts
 - Internet speed tests
 - DNS configuration management
 
 ### System Administration
+
 - Driver update checking and installation
 - System restore point creation and management
 - Registry-based configuration management
 
 ### User Interface
+
 - Text-based user interface using Blessed.js
 - Interactive menus and dialogs
 - Progress indicators and status updates
@@ -35,23 +40,29 @@ A comprehensive Windows system administration toolkit built with Node.js, provid
 ## Installation
 
 ### Prerequisites
+
 - Windows 10/11
 - Node.js 16.0 or higher
 - Administrator privileges for some operations
 
 ### Install from NPM (when published)
+
 ```bash
 npm install -g involvex-cli
 ```
 
 ### Manual Installation
+
 1. Clone or download this repository
 2. Navigate to the project directory
 3. Install dependencies:
+
 ```bash
 npm install
 ```
+
 4. Make the script executable (optional):
+
 ```bash
 chmod +x index.js
 ```
@@ -59,6 +70,7 @@ chmod +x index.js
 ## Usage
 
 ### Interactive Mode
+
 ```bash
 node index.js
 # or if installed globally
@@ -66,12 +78,14 @@ involvex-cli
 ```
 
 ### Command Line Options
+
 ```bash
 involvex-cli --help       # Show help information
 involvex-cli --version    # Show version information
 ```
 
 ### Navigation
+
 - Use arrow keys to navigate menus
 - Press Enter to select options
 - Press F10 or Escape to quit
@@ -80,22 +94,27 @@ involvex-cli --version    # Show version information
 ## Supported Package Managers
 
 ### Winget (Windows Package Manager)
+
 - Modern Windows package manager from Microsoft
 - Supports app updates and installations
 
 ### NPM (Node Package Manager)
+
 - Updates global npm packages
 - Manages Node.js development tools
 
 ### Scoop
+
 - Command-line installer for Windows
 - Lightweight package manager
 
 ### Chocolatey
+
 - Popular Windows package manager
 - Extensive package repository
 
 ### PowerShell Modules
+
 - Updates PowerShell modules and cmdlets
 - Supports both Windows PowerShell and PowerShell Core
 
@@ -109,6 +128,7 @@ involvex-cli --version    # Show version information
 ## Architecture
 
 ### Core Services
+
 - **LogService**: Centralized logging functionality
 - **ConfigService**: YAML-based configuration management
 - **PackageManagerService**: Multi-package manager support
@@ -121,6 +141,7 @@ involvex-cli --version    # Show version information
 - **SystemRestoreService**: System restore point management
 
 ### User Interface
+
 - Built with Blessed.js for terminal UI
 - Modular dialog system
 - Progress indicators and loading screens
@@ -129,11 +150,13 @@ involvex-cli --version    # Show version information
 ## Configuration
 
 The application stores configuration in:
+
 ```
 %APPDATA%\InvolveX\config.yaml
 ```
 
 Default configuration includes:
+
 - Enabled package managers
 - Update settings
 - UI preferences
@@ -142,6 +165,7 @@ Default configuration includes:
 ## Logging
 
 Logs are stored in:
+
 ```
 ./logs/update.log
 ```
@@ -151,6 +175,7 @@ All operations are logged with timestamps for troubleshooting and audit purposes
 ## Development
 
 ### Project Structure
+
 ```
 involvex_cli_js/
 ├── index.js              # Main application entry point
@@ -171,6 +196,7 @@ involvex_cli_js/
 ```
 
 ### Adding New Features
+
 1. Create new service in `services/` directory
 2. Implement required methods
 3. Add menu integration in `index.js`
@@ -178,6 +204,7 @@ involvex_cli_js/
 5. Test functionality
 
 ### Dependencies
+
 - **blessed**: Terminal UI framework
 - **commander**: Command-line argument parsing
 - **chalk**: Terminal text styling
@@ -191,18 +218,22 @@ involvex_cli_js/
 ### Common Issues
 
 **"InvolveX CLI requires an interactive terminal"**
+
 - Run in Command Prompt, PowerShell, or Windows Terminal
 - Avoid running in IDE terminals or CI/CD environments
 
 **"Administrator privileges required"**
+
 - Some operations require elevated permissions
 - Run as administrator for DNS changes, system restore, etc.
 
 **"Package manager not found"**
+
 - Ensure package managers are installed
 - Check PATH environment variable
 
 ### Debug Mode
+
 Enable debug logging by modifying the LogService configuration.
 
 ## Contributing
@@ -219,12 +250,14 @@ MIT License - see LICENSE file for details.
 ## Support
 
 For issues, questions, or contributions:
+
 - GitHub Issues: Report bugs and request features
 - GitHub Discussions: Ask questions and get help
 
 ## Changelog
 
 ### v1.0.0
+
 - Initial JavaScript port from C# version
 - Complete feature parity with original application
 - Blessed.js-based terminal user interface

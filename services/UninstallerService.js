@@ -1,16 +1,16 @@
 const { spawn } = require('child_process');
 
 class UninstallerService {
-    constructor(logService) {
-        this.logService = logService;
-    }
+  constructor(logService) {
+    this.logService = logService;
+  }
 
-    async listInstalledPrograms() {
-        this.logService.log("Listing installed programs from registry.");
-        const programs = [];
+  async listInstalledPrograms() {
+    this.logService.log('Listing installed programs from registry.');
+    const programs = [];
 
-        try {
-            const psScript = `
+    try {
+      const psScript = `
                 # Get installed programs from registry
                 $uninstallKeys = @(
                     "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
@@ -62,28 +62,28 @@ class UninstallerService {
                 }
             `;
 
-            const result = await this.runProcess('powershell', ['-Command', psScript]);
+      const result = await this.runProcess('powershell', ['-Command', psScript]);
 
-            if (result.code === 0) {
-                const lines = result.stdout.split('\n').filter(line => line.trim());
-                programs.push(...lines);
-            }
+      if (result.code === 0) {
+        const lines = result.stdout.split('\n').filter(line => line.trim());
+        programs.push(...lines);
+      }
 
-            this.logService.log(`Found ${programs.length} installed programs.`);
-        } catch (error) {
-            this.logService.log(`Exception listing installed programs: ${error.message}`);
-            programs.push(`Error: ${error.message}`);
-        }
-
-        return programs;
+      this.logService.log(`Found ${programs.length} installed programs.`);
+    } catch (error) {
+      this.logService.log(`Exception listing installed programs: ${error.message}`);
+      programs.push(`Error: ${error.message}`);
     }
 
-    async uninstallProgram(programName) {
-        this.logService.log(`Attempting to uninstall program: ${programName}`);
+    return programs;
+  }
 
-        try {
-            // Find the uninstall string for the program
-            const findScript = `
+  async uninstallProgram(programName) {
+    this.logService.log(`Attempting to uninstall program: ${programName}`);
+
+    try {
+      // Find the uninstall string for the program
+      const findScript = `
                 $programName = "${programName}"
                 $uninstallKeys = @(
                     "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
@@ -119,71 +119,73 @@ class UninstallerService {
                 }
             `;
 
-            const findResult = await this.runProcess('powershell', ['-Command', findScript]);
+      const findResult = await this.runProcess('powershell', ['-Command', findScript]);
 
-            if (findResult.code !== 0 || !findResult.stdout.trim()) {
-                this.logService.log(`Could not find uninstall string for: ${programName}`);
-                return false;
-            }
+      if (findResult.code !== 0 || !findResult.stdout.trim()) {
+        this.logService.log(`Could not find uninstall string for: ${programName}`);
+        return false;
+      }
 
-            const uninstallString = findResult.stdout.trim();
+      const uninstallString = findResult.stdout.trim();
 
-            // Execute the uninstall string
-            this.logService.log(`Executing uninstall command: ${uninstallString}`);
+      // Execute the uninstall string
+      this.logService.log(`Executing uninstall command: ${uninstallString}`);
 
-            // For MSI uninstallers, use msiexec
-            let process;
-            if (uninstallString.toLowerCase().includes('msiexec')) {
-                process = await this.runProcess('cmd', ['/c', uninstallString]);
-            } else {
-                // For other uninstallers, try to execute directly
-                process = await this.runProcess('cmd', ['/c', `"${uninstallString}"`]);
-            }
+      // For MSI uninstallers, use msiexec
+      let process;
+      if (uninstallString.toLowerCase().includes('msiexec')) {
+        process = await this.runProcess('cmd', ['/c', uninstallString]);
+      } else {
+        // For other uninstallers, try to execute directly
+        process = await this.runProcess('cmd', ['/c', `"${uninstallString}"`]);
+      }
 
-            if (process.code === 0) {
-                this.logService.log(`Successfully initiated uninstall for: ${programName}`);
-                return true;
-            } else {
-                this.logService.log(`Uninstall process exited with code ${process.code} for: ${programName}`);
-                return false;
-            }
-        } catch (error) {
-            this.logService.log(`Exception uninstalling program ${programName}: ${error.message}`);
-            return false;
-        }
+      if (process.code === 0) {
+        this.logService.log(`Successfully initiated uninstall for: ${programName}`);
+        return true;
+      } else {
+        this.logService.log(
+          `Uninstall process exited with code ${process.code} for: ${programName}`
+        );
+        return false;
+      }
+    } catch (error) {
+      this.logService.log(`Exception uninstalling program ${programName}: ${error.message}`);
+      return false;
     }
+  }
 
-    async runProcess(command, args) {
-        return new Promise((resolve, reject) => {
-            const process = spawn(command, args, {
-                stdio: ['pipe', 'pipe', 'pipe'],
-                shell: true
-            });
+  async runProcess(command, args) {
+    return new Promise((resolve, reject) => {
+      const process = spawn(command, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: true,
+      });
 
-            let stdout = '';
-            let stderr = '';
+      let stdout = '';
+      let stderr = '';
 
-            process.stdout.on('data', (data) => {
-                stdout += data.toString();
-            });
+      process.stdout.on('data', data => {
+        stdout += data.toString();
+      });
 
-            process.stderr.on('data', (data) => {
-                stderr += data.toString();
-            });
+      process.stderr.on('data', data => {
+        stderr += data.toString();
+      });
 
-            process.on('close', (code) => {
-                resolve({
-                    code,
-                    stdout,
-                    stderr
-                });
-            });
-
-            process.on('error', (error) => {
-                reject(error);
-            });
+      process.on('close', code => {
+        resolve({
+          code,
+          stdout,
+          stderr,
         });
-    }
+      });
+
+      process.on('error', error => {
+        reject(error);
+      });
+    });
+  }
 }
 
 module.exports = UninstallerService;
