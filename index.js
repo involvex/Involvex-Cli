@@ -3455,9 +3455,7 @@ async function main() {
             console.log('Installed Plugins:');
             plugins.forEach(plugin => {
               console.log(
-                `  ${plugin.name || 'Unknown'} v${plugin.version || '1.0.0'} - ${
-                  plugin.description || 'No description'
-                }`
+                `  ${plugin.name || 'Unknown'} v${plugin.version || '1.0.0'} - ${plugin.description || 'No description'}`
               );
             });
           }
@@ -3594,9 +3592,7 @@ async function main() {
         console.log(`Found ${updates.length} available update(s):`);
         updates.forEach(update =>
           console.log(
-            `${update.packageManager.toUpperCase()}: ${update.packageName} (${
-              update.currentVersion
-            } → ${update.availableVersion})`
+            `${update.packageManager.toUpperCase()}: ${update.packageName} (${update.currentVersion} → ${update.availableVersion})`
           )
         );
       }
@@ -3641,9 +3637,7 @@ async function main() {
         console.log('Installed Plugins:');
         plugins.forEach(plugin =>
           console.log(
-            `  ${plugin.name || 'Unknown'} v${plugin.version || '1.0.0'} - ${
-              plugin.description || 'No description'
-            }`
+            `  ${plugin.name || 'Unknown'} v${plugin.version || '1.0.0'} - ${plugin.description || 'No description'}`
           )
         );
       }
