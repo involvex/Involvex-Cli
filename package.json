@@ -1,0 +1,68 @@
+{
+  "name": "@involvex/involvex-cli",
+  "version": "1.0.0",
+  "description": "Windows System Administration Toolkit - JavaScript Edition",
+  "main": "index.js",
+  "bin": {
+    "involvex-cli": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "test": "jest --all",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint . --ext .js",
+    "lint:fix": "eslint . --ext .js --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "build": "npm run lint && npm run format && npm test",
+    "release": "npm run build && npm version patch && npm publish --access public",
+    "release:minor": "npm run build && npm version minor && npm publish --access public",
+    "release:major": "npm run build && npm version major && npm publish --access public",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "cli",
+    "windows",
+    "system-administration",
+    "package-manager",
+    "system-tools"
+  ],
+  "author": "InvolveX",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "os": [
+    "win32"
+  ],
+  "dependencies": {
+    "blessed": "^0.1.81",
+    "chalk": "^5.3.0",
+    "commander": "^11.1.0",
+    "fs-extra": "^11.2.0",
+    "inquirer": "^9.2.12",
+    "js-yaml": "^4.1.1",
+    "ora": "^7.0.1",
+    "ping": "^1.0.0",
+    "speedtest-net": "^2.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-node": "^11.1.0",
+    "jest": "^30.2.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/involvex/Involvex-Cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/involvex/Involvex-Cli/issues"
+  },
+  "homepage": "https://github.com/involvex/Involvex-Cli#readme"
+}
