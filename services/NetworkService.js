@@ -1,6 +1,4 @@
 const { spawn } = require('child_process');
-const https = require('https');
-const http = require('http');
 
 class NetworkService {
   constructor(logService) {
@@ -34,112 +32,41 @@ class NetworkService {
   }
 
   async runSpeedTest() {
-    this.logService.log('Running internet speed test.');
+    this.logService.log('Running internet speed test using speedtest-cli.');
 
     try {
-      // Simple speed test using HTTP download
-      const testUrls = [
-        'https://speed.cloudflare.com/__down?bytes=10000000', // 10MB test
-        'https://proof.ovh.net/files/10Mb.dat', // Alternative 10MB test
-      ];
+      const result = await this.runProcess('speedtest', ['--json']);
 
-      let bestResult = null;
-      let bestSpeed = 0;
+      if (result.code === 0) {
+        const speedtestOutput = JSON.parse(result.stdout);
 
-      for (const url of testUrls) {
-        try {
-          const result = await this.testDownloadSpeed(url);
-          if (result && result.speedMbps > bestSpeed) {
-            bestResult = result;
-            bestSpeed = result.speedMbps;
-          }
-        } catch (error) {
-          this.logService.log(`Speed test failed for ${url}: ${error.message}`);
-          continue;
+        if (
+          speedtestOutput &&
+          speedtestOutput.ping &&
+          speedtestOutput.download &&
+          speedtestOutput.upload
+        ) {
+          const formattedResult =
+            `Ping: ${speedtestOutput.ping.latency.toFixed(2)} ms (Jitter: ${speedtestOutput.ping.jitter.toFixed(2)} ms)\n` +
+            `Download: ${(speedtestOutput.download.bandwidth / 125000).toFixed(2)} Mbit/s\n` + // Convert bytes/sec to Mbit/s
+            `Upload: ${(speedtestOutput.upload.bandwidth / 125000).toFixed(2)} Mbit/s\n\n` + // Convert bytes/sec to Mbit/s
+            `Server: ${speedtestOutput.server.name} (${speedtestOutput.server.location}, ${speedtestOutput.server.country})\n` +
+            `ISP: ${speedtestOutput.isp}`;
+
+          this.logService.log('Speed test completed successfully.');
+          return formattedResult;
+        } else {
+          this.logService.log(`Speed test output was not in expected format: ${result.stdout}`);
+          return 'Error: Speed test output was not in expected format.';
         }
+      } else {
+        this.logService.log(`Speed test command failed with code ${result.code}: ${result.stderr}`);
+        return `Error running speed test: ${result.stderr || 'Unknown error'}`;
       }
-
-      if (!bestResult) {
-        return 'Speed test failed: Could not connect to any test servers.';
-      }
-
-      // Format result similar to speedtest-cli
-      const result =
-        `Ping: ${bestResult.ping} ms\n` +
-        `Download: ${bestResult.speedMbps.toFixed(2)} Mbit/s\n` +
-        `Upload: N/A (basic test)\n\n` +
-        `Test server: ${bestResult.server}\n` +
-        `Downloaded: ${(bestResult.bytes / 1024 / 1024).toFixed(2)} MB in ${bestResult.duration.toFixed(2)} seconds`;
-
-      this.logService.log('Speed test completed successfully.');
-      return result;
     } catch (error) {
       this.logService.log(`Exception running speed test: ${error.message}`);
       return `Error running speed test: ${error.message}`;
     }
-  }
-
-  async testDownloadSpeed(url) {
-    return new Promise((resolve, reject) => {
-      const startTime = Date.now();
-      let downloadedBytes = 0;
-      let pingTime = 0;
-
-      const protocol = url.startsWith('https:') ? https : http;
-
-      // First, measure ping (simple HEAD request)
-      const pingReq = protocol.request(url, { method: 'HEAD' }, _res => {
-        pingTime = Date.now() - startTime;
-
-        // Now do the actual download
-        const downloadReq = protocol.get(url, res => {
-          if (res.statusCode !== 200) {
-            reject(new Error(`HTTP ${res.statusCode}`));
-            return;
-          }
-
-          res.on('data', chunk => {
-            downloadedBytes += chunk.length;
-          });
-
-          res.on('end', () => {
-            const endTime = Date.now();
-            const duration = (endTime - startTime) / 1000; // seconds
-            const bits = downloadedBytes * 8;
-            const speedBps = bits / duration;
-            const speedMbps = speedBps / 1000000;
-
-            resolve({
-              speedMbps,
-              bytes: downloadedBytes,
-              duration,
-              ping: pingTime,
-              server: url,
-            });
-          });
-        });
-
-        downloadReq.on('error', error => {
-          reject(error);
-        });
-
-        downloadReq.setTimeout(30000, () => {
-          downloadReq.destroy();
-          reject(new Error('Download timeout'));
-        });
-      });
-
-      pingReq.on('error', error => {
-        reject(error);
-      });
-
-      pingReq.setTimeout(10000, () => {
-        pingReq.destroy();
-        reject(new Error('Ping timeout'));
-      });
-
-      pingReq.end();
-    });
   }
 
   async runProcess(command, args) {

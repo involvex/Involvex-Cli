@@ -3549,7 +3549,7 @@ async function main() {
     .option('--host <host>', 'Host for web server (default: 0.0.0.0)', '0.0.0.0')
     .option('--path <path>', 'Path to serve static files (optional)');
 
-  program.parse(process.argv);
+  await program.parseAsync(process.argv);
   const options = program.opts();
 
   // Since interactive mode is handled above, we just handle the other flags here.
