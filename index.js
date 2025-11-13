@@ -395,21 +395,25 @@ async function startTUI() {
   // Explicit key handlers for navigation
   menuList.key(['up'], () => {
     const current = menuList.selected;
+    let newIndex;
     if (current > 0) {
-      menuList.select(current - 1);
+      newIndex = current - 1;
     } else {
-      menuList.select(menuList.items.length - 1); // Wrap to bottom
+      newIndex = menuList.items.length - 1; // Wrap to bottom
     }
+    menuList.select(newIndex);
     screen.render();
   });
 
   menuList.key(['down'], () => {
     const current = menuList.selected;
+    let newIndex;
     if (current < menuList.items.length - 1) {
-      menuList.select(current + 1);
+      newIndex = current + 1;
     } else {
-      menuList.select(0); // Wrap to top
+      newIndex = 0; // Wrap to top
     }
+    menuList.select(newIndex);
     screen.render();
   });
 
