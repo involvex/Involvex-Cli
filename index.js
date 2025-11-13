@@ -261,29 +261,34 @@ async function checkForUpdates() {
 
 // Check if terminal is interactive
 function isInteractiveTerminal() {
-  // Check if stdin/stdout are redirected
-  if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    return false;
-  }
+  try {
+    // If running on Windows and within an npm script, assume interactive if TTY is present
+    if (
+      process.platform === 'win32' &&
+      (process.env.npm_lifecycle_event || process.env.npm_command)
+    ) {
+      return !!(process.stdin.isTTY && process.stdout.isTTY);
+    }
 
-  // Check for CI/CD environment variables
-  const ciVars = ['CI', 'CONTINUOUS_INTEGRATION', 'BUILD_NUMBER', 'TF_BUILD', 'GITHUB_ACTIONS'];
-  if (ciVars.some(varName => process.env[varName])) {
-    return false;
-  }
+    // Original checks for non-Windows or non-npm scripts
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      return false;
+    }
 
-  // Check for non-interactive terminal types
-  if (process.env.TERM === 'dumb' || process.env.TMUX || process.env.SCREEN) {
-    return false;
-  }
+    const ciVars = ['CI', 'CONTINUOUS_INTEGRATION', 'BUILD_NUMBER', 'TF_BUILD', 'GITHUB_ACTIONS'];
+    if (ciVars.some(varName => process.env[varName])) {
+      return false;
+    }
 
-  // On Windows, be permissive - allow all terminals with TTY
-  if (process.platform === 'win32') {
-    return true;
-  }
+    if (process.env.TERM === 'dumb' || process.env.TMUX || process.env.SCREEN) {
+      return false;
+    }
 
-  // For other platforms, allow if TTY is present
-  return true;
+    return true; // Default for other interactive terminals
+  } catch (e) {
+    console.error('DEBUG: Error inside isInteractiveTerminal():', e);
+    return false; // Assume non-interactive on error
+  }
 }
 
 // Show help information
@@ -411,11 +416,12 @@ async function startTUI() {
     smartCSR: true,
     title: 'InvolveX CLI',
     fullUnicode: true,
+    // Set terminal theme colors (green on black) directly in constructor
+    style: {
+      bg: 'black',
+      fg: 'green',
+    },
   });
-
-  // Set terminal theme colors (green on black)
-  screen.style.bg = 'black';
-  screen.style.fg = 'green';
 
   // Create main layout with terminal theme
   const mainFrame = blessed.box({
@@ -3395,7 +3401,12 @@ function showHelpDialog(screen) {
 async function main() {
   // Handle interactive mode explicitly before parsing other options
   if (process.argv.includes('--interactive') || process.argv.length <= 2) {
-    if (!isInteractiveTerminal()) {
+    // Check for FORCE_INTERACTIVE environment variable
+    const forceInteractiveEnv =
+      (process.env.FORCE_INTERACTIVE && process.env.FORCE_INTERACTIVE.trim()) === 'true';
+    const isInteractive = isInteractiveTerminal();
+
+    if (!forceInteractiveEnv && !isInteractive) {
       showNonInteractiveError();
       return;
     }
