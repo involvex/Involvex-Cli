@@ -6,4 +6,5 @@ module.exports = {
   coverageReporters: ['text', 'lcov', 'html'],
   setupFilesAfterEnv: [],
   testTimeout: 10000,
+  maxWorkers: 2, // Reduce workers to avoid memory issues
 };

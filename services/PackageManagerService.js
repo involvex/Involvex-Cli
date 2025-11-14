@@ -246,7 +246,7 @@ class PackageManagerService extends EventEmitter {
 
   async getAvailableUpdatesAsync() {
     const availableUpdates = [];
-    const timeoutMs = 15000; // 15 second timeout per package manager
+    const timeoutMs = 5000; // 5 second timeout per package manager
 
     // Check winget updates
     if (await this.isWingetInstalled()) {

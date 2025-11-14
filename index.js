@@ -552,9 +552,7 @@ async function startTUI() {
   mainFrame.append(menuList);
 
   // Set status bar content with terminal style
-  statusBar.setContent(
-    ' {green-fg}F9: Help | F10: Quit | ESC: Back | Use arrow keys to navigate{/green-fg} '
-  );
+  statusBar.setContent(' F9: Help | F10: Quit | ESC: Back | Use arrow keys to navigate ');
 
   // Menu selection handler
   menuList.on('select', async (item, _index) => {

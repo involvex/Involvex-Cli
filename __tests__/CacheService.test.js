@@ -1,5 +1,4 @@
 const CacheService = require('../services/CacheService');
-const fs = require('fs').promises; // Keep the original import
 const os = require('os');
 const path = require('path');
 
@@ -12,6 +11,20 @@ jest.mock('child_process', () => ({
 jest.mock('os', () => ({
   tmpdir: jest.fn(),
 }));
+
+// Mock fs.promises
+jest.mock('fs', () => ({
+  promises: {
+    readdir: jest.fn(),
+    stat: jest.fn(),
+    unlink: jest.fn(),
+    rmdir: jest.fn(),
+    mkdir: jest.fn(),
+    access: jest.fn(),
+  },
+}));
+
+const fs = require('fs').promises;
 
 // Mock LogService
 const mockLogService = {
@@ -28,14 +41,6 @@ describe('CacheService', () => {
 
     cacheService = new CacheService(mockLogService);
     os.tmpdir.mockReturnValue(mockTempDir);
-
-    // Mock fs.promises functions directly
-    fs.readdir = jest.fn();
-    fs.stat = jest.fn();
-    fs.unlink = jest.fn();
-    fs.rmdir = jest.fn();
-    fs.mkdir = jest.fn();
-    fs.access = jest.fn();
 
     // Mock global.gc
     global.gc = jest.fn();
