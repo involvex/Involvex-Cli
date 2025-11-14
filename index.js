@@ -3387,6 +3387,53 @@ function showHelpDialog(screen) {
 // Main function
 
 async function main() {
+  // Handle web server mode
+  if (process.argv.includes('--serve')) {
+    await initializeConfig();
+
+    const portIndex = process.argv.indexOf('--port');
+    const hostIndex = process.argv.indexOf('--host');
+    const pathIndex = process.argv.indexOf('--path');
+
+    const port =
+      portIndex !== -1 && portIndex + 1 < process.argv.length
+        ? parseInt(process.argv[portIndex + 1], 10)
+        : 3000;
+    const host =
+      hostIndex !== -1 && hostIndex + 1 < process.argv.length
+        ? process.argv[hostIndex + 1]
+        : '0.0.0.0';
+
+    const webServer = new WebServer(logService, {
+      packageManager: packageManagerService,
+      cache: cacheService,
+      startup: startupService,
+      uninstaller: uninstallerService,
+      dns: dnsService,
+      network: networkService,
+      plugin: pluginService,
+    });
+
+    if (pathIndex !== -1 && pathIndex + 1 < process.argv.length) {
+      const fs = require('fs');
+      const folderPath = path.resolve(process.argv[pathIndex + 1]);
+      if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
+        webServer.serveFolder(folderPath);
+        console.log(`Serving folder: ${folderPath}`);
+      } else {
+        console.error(`Error: ${folderPath} is not a directory`);
+        process.exit(1);
+      }
+    }
+
+    await webServer.start(port, host);
+    console.log(`\n🌐 Web server running at http://${host}:${port}`);
+    console.log('Press Ctrl+C to stop the server\n');
+    process.on('SIGINT', () => webServer.stop().then(() => process.exit(0)));
+    process.on('SIGTERM', () => webServer.stop().then(() => process.exit(0)));
+    return;
+  }
+
   // Handle interactive mode explicitly before parsing other options
   if (process.argv.includes('--interactive') || process.argv.length <= 2) {
     // Check for FORCE_INTERACTIVE environment variable

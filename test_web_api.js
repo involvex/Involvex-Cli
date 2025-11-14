@@ -14,10 +14,10 @@ async function testWebAPI() {
   };
 
   return new Promise((resolve, _reject) => {
-    const req = http.request(options, (res) => {
+    const req = http.request(options, res => {
       let data = '';
 
-      res.on('data', (chunk) => {
+      res.on('data', chunk => {
         data += chunk;
       });
 
@@ -33,7 +33,7 @@ async function testWebAPI() {
       });
     });
 
-    req.on('error', (error) => {
+    req.on('error', error => {
       console.error('Request error:', error.message);
       resolve({ error: error.message });
     });
@@ -49,10 +49,12 @@ async function testWebAPI() {
 }
 
 // Test the API
-testWebAPI().then(_result => {
-  console.log('Test completed');
-  process.exit(0);
-}).catch(error => {
-  console.error('Test failed:', error);
-  process.exit(1);
-});
+testWebAPI()
+  .then(_result => {
+    console.log('Test completed');
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error('Test failed:', error);
+    process.exit(1);
+  });
