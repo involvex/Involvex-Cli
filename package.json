@@ -4,7 +4,7 @@
   "description": "Windows System Administration Toolkit - JavaScript Edition",
   "main": "index.js",
   "bin": {
-    "involvex-cli": "./index.js"
+    "involvex": "./index.js"
   },
   "scripts": {
     "start": "start powershell -NoExit -Command \"$env:FORCE_INTERACTIVE='true'; node index.js --interactive\"",

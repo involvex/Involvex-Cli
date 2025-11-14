@@ -30,7 +30,7 @@ module.exports = [
     },
   },
   {
-    files: ['**/*.test.js', '**/*.spec.js'],
+    files: ['**/*.test.js', '**/*.spec.js', 'jest.setup.js'],
     languageOptions: {
       globals: {
         jest: 'readonly',
