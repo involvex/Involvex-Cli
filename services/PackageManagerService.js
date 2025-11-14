@@ -132,11 +132,17 @@ class PackageManagerService extends EventEmitter {
   }
 
   async updateSpecificProgramWithWinget(programName) {
-    return await this.runUpdateCommand('winget', ['upgrade', programName]);
+    return await this.runUpdateCommand('winget', [
+      'upgrade',
+      '--id',
+      programName,
+      '--accept-package-agreements',
+      '--accept-source-agreements',
+    ]);
   }
 
   async updateSpecificProgramWithNpm(programName) {
-    return await this.runUpdateCommand('npm', ['update', '-g', programName]);
+    return await this.runUpdateCommand('npm', ['install', '-g', programName]);
   }
 
   async updateSpecificProgramWithScoop(programName) {
@@ -406,88 +412,71 @@ class PackageManagerService extends EventEmitter {
   async getWingetAvailableUpdatesAsync() {
     try {
       const result = await this.runProcess('winget', ['upgrade']);
+
       if (result.code !== 0) {
         this.logService.log(`Winget command failed with code ${result.code}: ${result.stderr}`);
+
         return null;
       }
 
-      const lines = result.stdout.split('\n').filter(line => line.trim());
+      const lines = result.stdout.split('\n');
+
       const updates = [];
 
-      if (lines.length < 2) {
-        // Need at least header and separator
-        this.logService.log('Winget output too short to parse.');
-        return null;
-      }
+      for (const line of lines) {
+        const trimmed = line.trim();
 
-      const headerLine = lines[0];
-      // const separatorLine = lines[1]; // The line with '---' - not used
+        if (!trimmed) continue;
 
-      // Dynamically find column start and end indices based on the header line
-      const columnHeaders = ['Name', 'Id', 'Version', 'Available', 'Source'];
-      const columnPositions = []; // Stores { name: 'Name', start: 0, end: 5 }
+        // Skip header and separator lines
 
-      let lastHeaderEnd = -1;
-      for (const header of columnHeaders) {
-        const start = headerLine.indexOf(header, lastHeaderEnd + 1);
-        if (start !== -1) {
-          columnPositions.push({ name: header, start: start });
-          lastHeaderEnd = start + header.length; // Update lastHeaderEnd to be the end of the current header
-        } else {
-          this.logService.log(`Winget output header missing column: ${header}`);
-          return null;
-        }
-      }
-
-      // Determine end positions for each column
-      for (let i = 0; i < columnPositions.length; i++) {
-        if (i < columnPositions.length - 1) {
-          columnPositions[i].end = columnPositions[i + 1].start;
-        } else {
-          columnPositions[i].end = headerLine.length; // Last column goes to end of line
-        }
-      }
-
-      // Create a map for easier access
-      const columnMap = {};
-      columnPositions.forEach(col => {
-        columnMap[col.name] = col;
-      });
-
-      // Regex to capture Name, Id, Version, Available, Source
-      // This regex assumes:
-      // - Name can contain spaces and is followed by one or more spaces.
-      // - Id, Version, Available, Source are single tokens (no spaces within them) and are separated by one or more spaces.
-      // - The order of columns is always Name, Id, Version, Available, Source.
-      const dataLineRegex =
-        /^\s*(?<name>.+?)\s+(?<id>\S+)\s+(?<version>\S+)\s+(?<available>\S+)\s+(?<source>\S+)\s*$/;
-
-      // Iterate over data lines (starting from index 2, after header and separator)
-      for (let i = 2; i < lines.length; i++) {
-        const line = lines[i];
-        if (
-          line.includes('---') ||
-          line.includes('No installed package found matching the input criteria.')
-        ) {
-          continue; // Skip separator and "no updates" message
+        if (trimmed.startsWith('Name') || trimmed.includes('---') || trimmed.includes('====')) {
+          continue;
         }
 
-        const match = line.match(dataLineRegex);
-        if (match && match.groups) {
-          const { name, version, available } = match.groups;
+        // Skip lines that don't look like data (too short or no spaces)
+
+        if (trimmed.length < 10 || !trimmed.includes(' ')) {
+          continue;
+        }
+
+        // Split by whitespace and filter out empty parts
+
+        const parts = trimmed.split(/\s+/).filter(part => part.length > 0);
+
+        // Need at least 5 parts: name parts + id + current version + available version + source
+
+        if (parts.length >= 5) {
+          // Parse from the end: source, available version, current version, id, then name
+
+          const availableVersion = parts[parts.length - 2];
+
+          const currentVersion = parts[parts.length - 3];
+
+          const packageId = parts[parts.length - 4];
+
+          // Everything before the ID is the package name
+
+          const packageName = parts.slice(0, parts.length - 4).join(' ');
+
           updates.push({
             packageManager: 'winget',
-            packageName: name.trim(),
-            currentVersion: version.trim(),
-            availableVersion: available.trim(),
+
+            packageName,
+
+            packageId,
+
+            currentVersion,
+
+            availableVersion,
           });
-        } else {
-          this.logService.log(`Failed to parse winget output line: ${line}`);
         }
       }
+
       return updates;
     } catch (error) {
       this.logService.log(`Error getting winget available updates: ${error.message}`);
+
       return null;
     }
   }

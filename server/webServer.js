@@ -32,6 +32,7 @@ class WebServer {
           'Network',
           'Driver',
           'System Restore',
+          'Storage Manager',
           'Plugins',
           'Settings',
         ],
@@ -42,6 +43,24 @@ class WebServer {
       try {
         const updates = await this.services.packageManager.getAvailableUpdatesAsync();
         res.json({ success: true, updates });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+
+    this.app.get('/api/cli-updates', async (req, res) => {
+      try {
+        const updateInfo = await this.services.autoUpdate.checkForUpdates();
+        res.json({ success: true, updateInfo });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+
+    this.app.post('/api/cli-updates/install', async (req, res) => {
+      try {
+        const result = await this.services.autoUpdate.installUpdate();
+        res.json({ success: result });
       } catch (error) {
         res.json({ success: false, error: error.message });
       }
@@ -155,6 +174,65 @@ class WebServer {
         const drives = await monitor.getDriveUsage();
         await monitor.shutdownAsync();
         res.json({ success: true, cpu, memory, drives });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+
+    // Storage Manager API endpoints
+    this.app.get('/api/storage/disk-info', async (req, res) => {
+      try {
+        const diskInfo = await this.services.storageManager.getDiskInfo();
+        res.json({ success: true, diskInfo });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+
+    this.app.post('/api/storage/defragment/:drive', async (req, res) => {
+      try {
+        const { drive } = req.params;
+        const result = await this.services.storageManager.defragmentDrive(drive);
+        res.json({ success: true, result });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+
+    this.app.get('/api/storage/cleanup-targets', async (req, res) => {
+      try {
+        const targets = await this.services.storageManager.getCleanupTargets();
+        res.json({ success: true, targets });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+
+    this.app.post('/api/storage/clean-temp', async (req, res) => {
+      try {
+        const { targetPaths } = req.body;
+        const result = await this.services.storageManager.cleanTempFiles(targetPaths);
+        res.json({ success: true, result });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+
+    this.app.post('/api/storage/scan-directory', async (req, res) => {
+      try {
+        const { directoryPath, minSizeMB } = req.body;
+        const result = await this.services.storageManager.scanDirectory(directoryPath, minSizeMB);
+        res.json({ success: true, result });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+
+    this.app.post('/api/storage/delete-items', async (req, res) => {
+      try {
+        const { items } = req.body;
+        const result = await this.services.storageManager.deleteItems(items);
+        res.json({ success: true, result });
       } catch (error) {
         res.json({ success: false, error: error.message });
       }
@@ -437,7 +515,7 @@ class WebServer {
             matrixBg.appendChild(char);
         }
         
-        const menuItems = ['Update', 'Cache', 'Startup', 'Uninstall', 'DNS', 'Network', 'Driver', 'System Restore', 'Plugins', 'Settings'];
+        const menuItems = ['Update', 'Cache', 'Startup', 'Uninstall', 'DNS', 'Network', 'Driver', 'System Restore', 'Storage Manager', 'Plugins', 'Settings'];
         const menu = document.getElementById('menu');
         const content = document.getElementById('content');
 
@@ -455,11 +533,26 @@ class WebServer {
                 switch(item) {
                     case 'Update':
                         const updates = await fetch('/api/updates').then(r => r.json());
-                        if (updates.success) {
-                            content.innerHTML = '<h2>Available Updates</h2><pre>' + JSON.stringify(updates.updates, null, 2) + '</pre>';
+                        const cliUpdates = await fetch('/api/cli-updates').then(r => r.json());
+                        let html = '<h2>Available Updates</h2>';
+
+                        if (cliUpdates.success && cliUpdates.updateInfo.hasUpdate) {
+                            html += '<h3>CLI Updates</h3>';
+                            html += '<p>Latest version: ' + cliUpdates.updateInfo.latestVersion + '</p>';
+                            html += '<p>' + cliUpdates.updateInfo.description + '</p>';
+                            html += '<button onclick="installCliUpdate()">Install CLI Update</button>';
                         } else {
-                            content.innerHTML = '<p class="error">Error: ' + updates.error + '</p>';
+                            html += '<h3>CLI Updates</h3><p>No CLI updates available</p>';
                         }
+
+                        if (updates.success && updates.updates.length > 0) {
+                            html += '<h3>Package Manager Updates</h3>';
+                            html += '<pre>' + JSON.stringify(updates.updates, null, 2) + '</pre>';
+                        } else {
+                            html += '<h3>Package Manager Updates</h3><p>No package updates available</p>';
+                        }
+
+                        content.innerHTML = html;
                         break;
                     case 'Cache':
                         content.innerHTML = '<h2>Cache Management</h2><button onclick="clearCache()">Clear System Cache</button><button onclick="clearMemory()">Clear Memory</button>';
@@ -499,6 +592,19 @@ class WebServer {
                             content.innerHTML = '<p class="error">Error: ' + plugins.error + '</p>';
                         }
                         break;
+                    case 'Storage Manager':
+                        const diskInfo = await fetch('/api/storage/disk-info').then(r => r.json());
+                        if (diskInfo.success) {
+                            let html = '<h2>Storage Manager</h2>';
+                            html += '<h3>Disk Information</h3>';
+                            html += '<pre>' + JSON.stringify(diskInfo.diskInfo, null, 2) + '</pre>';
+                            html += '<button onclick="getCleanupTargets()">Show Cleanup Targets</button>';
+                            html += '<button onclick="scanDirectory()">Scan Directory</button>';
+                            content.innerHTML = html;
+                        } else {
+                            content.innerHTML = '<p class="error">Error: ' + diskInfo.error + '</p>';
+                        }
+                        break;
                     case 'System Restore':
                         content.innerHTML = '<h2>System Restore</h2><p>System restore functionality</p>';
                         break;
@@ -526,6 +632,37 @@ class WebServer {
         async function runPing() {
             const result = await fetch('/api/network/ping', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({host: '8.8.8.8'}) }).then(r => r.json());
             content.innerHTML = '<h2>Ping Results</h2><pre>' + JSON.stringify(result, null, 2) + '</pre>';
+        }
+
+        async function installCliUpdate() {
+            const result = await fetch('/api/cli-updates/install', { method: 'POST' }).then(r => r.json());
+            content.innerHTML = '<p class="' + (result.success ? 'success' : 'error') + '">' + (result.success ? 'CLI updated successfully!' : 'Error: ' + result.error) + '</p>';
+        }
+
+        async function getCleanupTargets() {
+            const result = await fetch('/api/storage/cleanup-targets').then(r => r.json());
+            if (result.success) {
+                content.innerHTML = '<h2>Cleanup Targets</h2><pre>' + JSON.stringify(result.targets, null, 2) + '</pre>';
+            } else {
+                content.innerHTML = '<p class="error">Error: ' + result.error + '</p>';
+            }
+        }
+
+        async function scanDirectory() {
+            const directoryPath = prompt('Enter directory path to scan:', 'C:\\\\');
+            if (directoryPath) {
+                const minSizeMB = prompt('Enter minimum file size in MB:', '100');
+                const result = await fetch('/api/storage/scan-directory', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ directoryPath, minSizeMB: parseInt(minSizeMB) })
+                }).then(r => r.json());
+                if (result.success) {
+                    content.innerHTML = '<h2>Directory Scan Results</h2><pre>' + JSON.stringify(result.result, null, 2) + '</pre>';
+                } else {
+                    content.innerHTML = '<p class="error">Error: ' + result.error + '</p>';
+                }
+            }
         }
     </script>
 </body>

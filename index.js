@@ -24,6 +24,7 @@ const PluginService = require('./services/PluginService');
 const PluginRepositoryService = require('./services/PluginRepositoryService');
 const SettingsService = require('./services/SettingsService');
 const AutoUpdateService = require('./services/AutoUpdateService');
+const StorageManagerService = require('./services/StorageManagerService');
 const WebServer = require('./server/webServer');
 
 // Initialize services
@@ -41,6 +42,7 @@ const systemRestoreService = new SystemRestoreService(logService);
 const pluginService = new PluginService(logService, configService);
 const pluginRepositoryService = new PluginRepositoryService(logService);
 const autoUpdateService = new AutoUpdateService(logService, settingsService);
+const storageManagerService = new StorageManagerService(logService);
 
 process.on('exit', () => {
   if (global.discordRPCPlugin) {
@@ -532,6 +534,7 @@ async function startTUI() {
     items: [
       'Update',
       'Cache',
+      'Storage Manager',
       'Startup',
       'Uninstall',
       'DNS',
@@ -565,6 +568,9 @@ async function startTUI() {
           break;
         case 'Cache':
           await showCacheMenu(screen);
+          break;
+        case 'Storage Manager':
+          await showStorageManagerMenu(screen);
           break;
         case 'Startup':
           await showStartupMenu(screen);
@@ -1120,6 +1126,503 @@ async function showDriverMenu(screen) {
   });
 }
 
+async function showStorageManagerMenu(screen) {
+  const storageDialog = blessed.list({
+    top: 'center',
+    left: 'center',
+    width: '50%',
+    height: '50%',
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Storage Manager{/green-fg} ',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+      selected: {
+        bg: 'green',
+        fg: 'black',
+      },
+    },
+    keys: true,
+    items: [
+      'View Disk Information',
+      'Defragment Drive',
+      'Scan for Large Files',
+      'Intelligent Cleanup',
+      'Back',
+    ],
+  });
+
+  screen.append(storageDialog);
+  screen.render();
+  storageDialog.focus();
+
+  storageDialog.on('select', async (item, _index) => {
+    const selected = item.getText();
+
+    try {
+      switch (selected) {
+        case 'View Disk Information': {
+          await showDiskInfoDialog(screen);
+          break;
+        }
+        case 'Defragment Drive': {
+          await showDefragmentDialog(screen);
+          break;
+        }
+        case 'Scan for Large Files': {
+          await showLargeFilesScanDialog(screen);
+          break;
+        }
+        case 'Intelligent Cleanup': {
+          await showIntelligentCleanupDialog(screen);
+          break;
+        }
+      }
+    } catch (error) {
+      showMessage(screen, 'Error', `Storage operation failed: ${error.message}`);
+    }
+
+    if (
+      selected !== 'View Disk Information' &&
+      selected !== 'Defragment Drive' &&
+      selected !== 'Scan for Large Files' &&
+      selected !== 'Intelligent Cleanup'
+    ) {
+      storageDialog.destroy();
+      screen.render();
+    }
+  });
+
+  storageDialog.key(['escape'], () => {
+    storageDialog.destroy();
+    screen.render();
+  });
+}
+
+async function showDiskInfoDialog(screen) {
+  const progressDialog = blessed.loading({
+    top: 'center',
+    left: 'center',
+    width: '50%',
+    height: '20%',
+    border: {
+      type: 'line',
+    },
+    label: ' Getting Disk Information ',
+    style: {
+      border: {
+        fg: 'blue',
+      },
+    },
+  });
+
+  screen.append(progressDialog);
+  progressDialog.load('Retrieving disk information...');
+  screen.render();
+
+  try {
+    const diskInfo = await storageManagerService.getDiskInfo();
+    progressDialog.stop();
+    progressDialog.destroy();
+
+    if (diskInfo.length === 0) {
+      showMessage(screen, 'Disk Information', 'No disk information available.');
+      return;
+    }
+
+    const infoText = diskInfo
+      .map(
+        disk =>
+          `${disk.drive} (${disk.label})\n` +
+          `  Filesystem: ${disk.filesystem}\n` +
+          `  Total: ${(disk.totalSize / (1024 * 1024 * 1024)).toFixed(2)} GB\n` +
+          `  Free: ${(disk.freeSpace / (1024 * 1024 * 1024)).toFixed(2)} GB\n` +
+          `  Used: ${(disk.usedSpace / (1024 * 1024 * 1024)).toFixed(2)} GB (${disk.usagePercent}%)\n`
+      )
+      .join('\n');
+
+    showMessage(screen, 'Disk Information', infoText);
+  } catch (error) {
+    progressDialog.stop();
+    progressDialog.destroy();
+    showMessage(screen, 'Error', `Failed to get disk information: ${error.message}`);
+  }
+}
+
+async function showDefragmentDialog(screen) {
+  const diskInfo = await storageManagerService.getDiskInfo();
+  const drives = diskInfo.map(disk => disk.drive.replace('\\', ''));
+
+  if (drives.length === 0) {
+    showMessage(screen, 'Error', 'No drives available for defragmentation.');
+    return;
+  }
+
+  const driveDialog = blessed.list({
+    top: 'center',
+    left: 'center',
+    width: '40%',
+    height: '40%',
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Select Drive to Defragment{/green-fg} ',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+      selected: {
+        bg: 'green',
+        fg: 'black',
+      },
+    },
+    keys: true,
+    items: drives,
+  });
+
+  screen.append(driveDialog);
+  screen.render();
+  driveDialog.focus();
+
+  driveDialog.on('select', async (item, _index) => {
+    const selectedDrive = item.getText();
+    driveDialog.destroy();
+
+    const progressDialog = blessed.loading({
+      top: 'center',
+      left: 'center',
+      width: '50%',
+      height: '20%',
+      border: {
+        type: 'line',
+      },
+      label: ` Defragmenting ${selectedDrive}: `,
+      style: {
+        border: {
+          fg: 'yellow',
+        },
+      },
+    });
+
+    screen.append(progressDialog);
+    progressDialog.load('Starting defragmentation...');
+    screen.render();
+
+    try {
+      const result = await storageManagerService.defragmentDrive(selectedDrive);
+      progressDialog.stop();
+      progressDialog.destroy();
+
+      if (result.success) {
+        showMessage(screen, 'Success', `Defragmentation completed!\n\n${result.message}`);
+      } else {
+        showMessage(screen, 'Error', 'Defragmentation failed or was not supported.');
+      }
+    } catch (error) {
+      progressDialog.stop();
+      progressDialog.destroy();
+      showMessage(screen, 'Error', `Defragmentation failed: ${error.message}`);
+    }
+  });
+
+  driveDialog.key(['escape'], () => {
+    driveDialog.destroy();
+    screen.render();
+  });
+}
+
+async function showLargeFilesScanDialog(screen) {
+  const inputDialog = blessed.prompt({
+    top: 'center',
+    left: 'center',
+    width: '50%',
+    height: '25%',
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Scan for Large Files{/green-fg} ',
+    style: {
+      border: {
+        fg: 'cyan',
+      },
+    },
+  });
+
+  screen.append(inputDialog);
+  screen.render();
+
+  inputDialog.input(
+    'Enter directory path to scan (default: C:\\):',
+    'C:\\',
+    async (error, directoryPath) => {
+      if (error) {
+        inputDialog.destroy();
+        screen.render();
+        return;
+      }
+
+      const path = directoryPath || 'C:\\';
+
+      const progressDialog = blessed.loading({
+        top: 'center',
+        left: 'center',
+        width: '50%',
+        height: '20%',
+        border: {
+          type: 'line',
+        },
+        label: ' Scanning for Large Files ',
+        style: {
+          border: {
+            fg: 'cyan',
+          },
+        },
+      });
+
+      inputDialog.destroy();
+      screen.append(progressDialog);
+      progressDialog.load(`Scanning ${path}...`);
+      screen.render();
+
+      try {
+        const results = await storageManagerService.scanDirectory(path, 100); // 100MB minimum
+        progressDialog.stop();
+        progressDialog.destroy();
+
+        const largeFilesText = results.largeFiles
+          .slice(0, 20)
+          .map(
+            file =>
+              `${file.path}\n  Size: ${file.sizeMB} MB\n  Modified: ${file.modified.toLocaleDateString()}\n`
+          )
+          .join('\n');
+
+        const largeFoldersText = results.largeFolders
+          .slice(0, 10)
+          .map(
+            folder => `${folder.path}\n  Size: ${folder.sizeMB} MB\n  Items: ${folder.itemCount}\n`
+          )
+          .join('\n');
+
+        const summary =
+          `Scan Results for ${path}:\n\n` +
+          `Total items scanned: ${results.totalScanned}\n` +
+          `Large files found: ${results.largeFiles.length}\n` +
+          `Large folders found: ${results.largeFolders.length}\n\n`;
+
+        let resultText = summary;
+        if (largeFilesText) {
+          resultText += `LARGE FILES (>100MB):\n${largeFilesText}\n\n`;
+        }
+        if (largeFoldersText) {
+          resultText += `LARGE FOLDERS (>100MB):\n${largeFoldersText}`;
+        }
+
+        if (results.largeFiles.length === 0 && results.largeFolders.length === 0) {
+          resultText += 'No large files or folders found.';
+        }
+
+        showMessage(screen, 'Large Files Scan Results', resultText);
+      } catch (error) {
+        progressDialog.stop();
+        progressDialog.destroy();
+        showMessage(screen, 'Error', `Scan failed: ${error.message}`);
+      }
+    }
+  );
+}
+
+async function showIntelligentCleanupDialog(screen) {
+  const progressDialog = blessed.loading({
+    top: 'center',
+    left: 'center',
+    width: '50%',
+    height: '20%',
+    border: {
+      type: 'line',
+    },
+    label: ' Analyzing Cleanup Targets ',
+    style: {
+      border: {
+        fg: 'magenta',
+      },
+    },
+  });
+
+  screen.append(progressDialog);
+  progressDialog.load('Finding cleanup opportunities...');
+  screen.render();
+
+  try {
+    const cleanupTargets = await storageManagerService.getCleanupTargets();
+    progressDialog.stop();
+    progressDialog.destroy();
+
+    if (cleanupTargets.length === 0) {
+      showMessage(screen, 'Cleanup Analysis', 'No cleanup targets found.');
+      return;
+    }
+
+    const form = blessed.form({
+      top: 'center',
+      left: 'center',
+      width: '80%',
+      height: '80%',
+      border: {
+        type: 'line',
+      },
+      label: ' {green-fg}Intelligent Cleanup{/green-fg} ',
+      style: {
+        bg: 'black',
+        fg: 'green',
+        border: {
+          fg: 'green',
+        },
+      },
+      keys: true,
+    });
+
+    const checkList = blessed.checklist({
+      parent: form,
+      top: 1,
+      left: 1,
+      width: '100%-4',
+      height: '100%-5',
+      style: {
+        bg: 'black',
+        fg: 'green',
+        selected: {
+          bg: 'green',
+          fg: 'black',
+        },
+      },
+      mouse: true,
+      interactive: true,
+      items: cleanupTargets.map(
+        target => `${target.name}: ${target.sizeMB} MB (${target.itemCount} items)`
+      ),
+    });
+
+    const cleanButton = blessed.button({
+      parent: form,
+      bottom: 1,
+      left: 2,
+      width: 15,
+      height: 1,
+      content: 'Clean Selected',
+      style: {
+        bg: 'green',
+        fg: 'black',
+        focus: {
+          bg: 'blue',
+        },
+      },
+    });
+
+    const cancelButton = blessed.button({
+      parent: form,
+      bottom: 1,
+      right: 2,
+      width: 10,
+      height: 1,
+      content: 'Cancel',
+      style: {
+        bg: 'red',
+        fg: 'white',
+        focus: {
+          bg: 'blue',
+        },
+      },
+    });
+
+    screen.append(form);
+    screen.render();
+    checkList.focus();
+
+    cleanButton.on('press', async () => {
+      const selectedTargets = [];
+      checkList.items.forEach((item, i) => {
+        if (item.checked) {
+          selectedTargets.push(cleanupTargets[i].path);
+        }
+      });
+
+      if (selectedTargets.length === 0) {
+        showMessage(screen, 'No Selection', 'Please select at least one cleanup target.');
+        return;
+      }
+
+      form.destroy();
+
+      const cleanProgress = blessed.loading({
+        top: 'center',
+        left: 'center',
+        width: '50%',
+        height: '20%',
+        border: {
+          type: 'line',
+        },
+        label: ' Cleaning Selected Targets ',
+        style: {
+          border: {
+            fg: 'magenta',
+          },
+        },
+      });
+
+      screen.append(cleanProgress);
+      cleanProgress.load('Performing intelligent cleanup...');
+      screen.render();
+
+      try {
+        const results = await storageManagerService.cleanTempFiles(selectedTargets);
+        cleanProgress.stop();
+        cleanProgress.destroy();
+
+        let resultText =
+          `Cleanup completed!\n\n` +
+          `Total space freed: ${results.totalSizeFreedMB} MB\n\n` +
+          `Successfully cleaned:\n${results.cleaned
+            .map(c => `  ${c.path}: ${c.sizeFreedMB} MB freed`)
+            .join('\n')}`;
+
+        if (results.failed.length > 0) {
+          resultText += `\n\nFailed to clean:\n${results.failed
+            .map(f => `  ${f.path}: ${f.error}`)
+            .join('\n')}`;
+        }
+
+        showMessage(screen, 'Cleanup Results', resultText);
+      } catch (error) {
+        cleanProgress.stop();
+        cleanProgress.destroy();
+        showMessage(screen, 'Error', `Cleanup failed: ${error.message}`);
+      }
+    });
+
+    cancelButton.on('press', () => {
+      form.destroy();
+      screen.render();
+    });
+
+    form.key(['escape'], () => {
+      form.destroy();
+      screen.render();
+    });
+  } catch (error) {
+    progressDialog.stop();
+    progressDialog.destroy();
+    showMessage(screen, 'Error', `Failed to analyze cleanup targets: ${error.message}`);
+  }
+}
+
 async function showSystemRestoreMenu(screen) {
   const restoreDialog = blessed.list({
     top: 'center',
@@ -1320,18 +1823,7 @@ async function showAvailableUpdates(screen) {
         'No updates available. All packages are up to date!'
       );
     } else {
-      const updateText = updates
-        .map(
-          update =>
-            `${update.packageManager.toUpperCase()}: ${update.packageName} (${update.currentVersion} → ${update.availableVersion})`
-        )
-        .join('\n');
-
-      showMessage(
-        screen,
-        'Available Updates',
-        `Found ${updates.length} available update(s):\n\n${updateText}`
-      );
+      await showUpdateSelection(screen, updates);
     }
   } catch (error) {
     clearInterval(messageInterval);
@@ -1340,6 +1832,230 @@ async function showAvailableUpdates(screen) {
     screen.render();
     showMessage(screen, 'Error', `Failed to check for updates: ${error.message}`);
   }
+}
+
+async function showUpdateSelection(screen, updates) {
+  const form = blessed.form({
+    top: 'center',
+    left: 'center',
+    width: '80%',
+    height: '80%',
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Available Updates{/green-fg} ',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+    keys: true,
+  });
+
+  const checkList = blessed.checklist({
+    parent: form,
+    top: 1,
+    left: 1,
+    width: '100%-4',
+    height: '100%-5',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      selected: {
+        bg: 'green',
+        fg: 'black',
+      },
+    },
+    mouse: true,
+    interactive: true,
+    items: updates.map(
+      update =>
+        `${update.packageManager.toUpperCase()}: ${update.packageName} (${update.currentVersion} → ${
+          update.availableVersion
+        })`
+    ),
+  });
+
+  const selectAllButton = blessed.button({
+    parent: form,
+    bottom: 1,
+    left: 2,
+    width: 12,
+    height: 1,
+    content: 'Select All',
+    style: {
+      bg: 'green',
+      fg: 'black',
+      focus: {
+        bg: 'blue',
+      },
+    },
+  });
+
+  const updateButton = blessed.button({
+    parent: form,
+    bottom: 1,
+    left: 15,
+    width: 18,
+    height: 1,
+    content: 'Update Selected',
+    style: {
+      bg: 'green',
+      fg: 'black',
+      focus: {
+        bg: 'blue',
+      },
+    },
+  });
+
+  const cancelButton = blessed.button({
+    parent: form,
+    bottom: 1,
+    right: 2,
+    width: 10,
+    height: 1,
+    content: 'Cancel',
+    style: {
+      bg: 'red',
+      fg: 'white',
+      focus: {
+        bg: 'blue',
+      },
+    },
+  });
+
+  screen.append(form);
+  screen.render();
+  checkList.focus();
+
+  selectAllButton.on('press', () => {
+    checkList.items.forEach((_, i) => checkList.selectItem(i));
+    screen.render();
+  });
+
+  updateButton.on('press', async () => {
+    const selectedUpdates = [];
+    checkList.items.forEach((item, i) => {
+      if (item.checked) {
+        selectedUpdates.push(updates[i]);
+      }
+    });
+
+    if (selectedUpdates.length > 0) {
+      form.destroy();
+      await runUpdates(screen, selectedUpdates);
+    } else {
+      showMessage(screen, 'No Selection', 'Please select at least one update.');
+    }
+  });
+
+  cancelButton.on('press', () => {
+    form.destroy();
+    screen.render();
+  });
+
+  form.key(['escape'], () => {
+    form.destroy();
+    screen.render();
+  });
+}
+
+async function runUpdates(screen, updates) {
+  const progressDialog = blessed.box({
+    top: 'center',
+    left: 'center',
+    width: '70%',
+    height: '60%',
+    border: {
+      type: 'line',
+    },
+    label: ' {green-fg}Updating Packages{/green-fg} ',
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+  });
+
+  const progressBar = blessed.progressbar({
+    parent: progressDialog,
+    bottom: 1,
+    left: 'center',
+    width: '90%',
+    height: 3,
+    style: {
+      bar: {
+        bg: 'green',
+      },
+    },
+    filled: 0,
+  });
+
+  const logBox = blessed.log({
+    parent: progressDialog,
+    top: 1,
+    left: 1,
+    width: '100%-4',
+    height: '100%-5',
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: {
+      ch: ' ',
+      track: {
+        bg: 'cyan',
+      },
+      style: {
+        inverse: true,
+      },
+    },
+  });
+
+  screen.append(progressDialog);
+  screen.render();
+
+  const totalUpdates = updates.length;
+  let completedUpdates = 0;
+
+  for (const update of updates) {
+    logBox.log(`Updating ${update.packageName} using ${update.packageManager}...`);
+    screen.render();
+
+    try {
+      switch (update.packageManager) {
+        case 'winget':
+          await packageManagerService.updateSpecificProgramWithWinget(update.packageId);
+          break;
+        case 'npm':
+          await packageManagerService.updateSpecificProgramWithNpm(update.packageName);
+          break;
+        case 'scoop':
+          await packageManagerService.updateSpecificProgramWithScoop(update.packageName);
+          break;
+        case 'choco':
+          await packageManagerService.updateSpecificProgramWithChoco(update.packageName);
+          break;
+      }
+      logBox.log(`Successfully updated ${update.packageName}.`);
+    } catch (error) {
+      logBox.log(`Failed to update ${update.packageName}: ${error.message}`);
+    }
+
+    completedUpdates++;
+    progressBar.setProgress((completedUpdates / totalUpdates) * 100);
+    screen.render();
+  }
+
+  logBox.log('All updates completed.');
+  screen.render();
+
+  setTimeout(() => {
+    progressDialog.destroy();
+    screen.render();
+  }, 3000);
 }
 
 async function runPackageUpdate(screen, managerName, updateFunction) {
@@ -3412,6 +4128,7 @@ async function main() {
       dns: dnsService,
       network: networkService,
       plugin: pluginService,
+      storageManager: storageManagerService,
     });
 
     if (pathIndex !== -1 && pathIndex + 1 < process.argv.length) {
@@ -3605,6 +4322,7 @@ async function main() {
       dns: dnsService,
       network: networkService,
       plugin: pluginService,
+      storageManager: storageManagerService,
     });
 
     if (pathIndex !== -1 && pathIndex + 1 < args.length) {

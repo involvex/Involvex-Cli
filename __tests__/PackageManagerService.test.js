@@ -317,12 +317,14 @@ PowerToys            Microsoft.PowerToys  0.51.1           0.53.0           wing
         {
           packageManager: 'winget',
           packageName: 'Microsoft Visual C++ 2015-2019 Redist',
+          packageId: 'Microsoft.VC++2015-2019Redist-x64',
           currentVersion: '14.29.30139.0',
           availableVersion: '14.30.30704.0',
         },
         {
           packageManager: 'winget',
           packageName: 'PowerToys',
+          packageId: 'Microsoft.PowerToys',
           currentVersion: '0.51.1',
           availableVersion: '0.53.0',
         },
