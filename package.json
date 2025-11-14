@@ -4,7 +4,7 @@
   "description": "Windows System Administration Toolkit - JavaScript Edition",
   "main": "index.js",
   "bin": {
-    "involvex": "./index.js"
+    "involvex-cli": "index.js"
   },
   "scripts": {
     "start": "start powershell -NoExit -Command \"$env:FORCE_INTERACTIVE='true'; node index.js --interactive\"",
@@ -59,7 +59,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/involvex/Involvex-Cli.git"
+    "url": "git+https://github.com/involvex/Involvex-Cli.git"
   },
   "bugs": {
     "url": "https://github.com/involvex/Involvex-Cli/issues"
