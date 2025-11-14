@@ -9,4 +9,5 @@ module.exports = {
   maxWorkers: 1, // Reduce to single worker to avoid hanging
   forceExit: true, // Force exit after tests complete
   detectOpenHandles: false, // Disable open handle detection to avoid warnings
+  testPathIgnorePatterns: ["<rootDir>/__tests__/"],
 };

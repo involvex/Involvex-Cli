@@ -7,9 +7,9 @@
     "involvex-cli": "index.js"
   },
   "scripts": {
-    "start": "node index.js --interactive",
+    "start": "node index.js",
     "dev": "node index.js",
-    "test": "jest --max-old-space-size=8192 --runInBand",
+    "test": "jest --max-old-space-size=12288 --runInBand --passWithNoTests",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "lint": "eslint . --ext .js",

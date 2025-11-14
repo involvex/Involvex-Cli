@@ -41,7 +41,7 @@ const driverService = new DriverService(logService);
 const systemRestoreService = new SystemRestoreService(logService);
 const pluginService = new PluginService(logService, configService);
 const pluginRepositoryService = new PluginRepositoryService(logService);
-const autoUpdateService = new AutoUpdateService(logService, settingsService);
+const autoUpdateService = new AutoUpdateService(logService, settingsService, packageManagerService);
 const storageManagerService = new StorageManagerService(logService);
 
 process.on('exit', () => {
@@ -669,7 +669,7 @@ async function showUpdateMenu(screen) {
     top: 'center',
     left: 'center',
     width: '50%',
-    height: '50%',
+    height: '30%',
     border: {
       type: 'line',
     },
@@ -686,17 +686,7 @@ async function showUpdateMenu(screen) {
       },
     },
     keys: true,
-    items: [
-      'Show Available Updates',
-      'Update Winget',
-      'Update NPM',
-      'Update Scoop',
-      'Update Chocolatey',
-      'Update Pip',
-      'Update PowerShell Modules',
-      'Update All',
-      'Back',
-    ],
+    items: ['Show Available Updates', 'Back'],
   });
 
   screen.append(updateDialog);
@@ -713,43 +703,15 @@ async function showUpdateMenu(screen) {
           await showAvailableUpdates(screen);
           break;
         }
-        case 'Update Winget': {
-          await runPackageUpdate(screen, 'winget', () => packageManagerService.updateWinget());
-          break;
-        }
-        case 'Update NPM': {
-          await runPackageUpdate(screen, 'npm', () => packageManagerService.updateNpm());
-          break;
-        }
-        case 'Update Scoop': {
-          await runPackageUpdate(screen, 'scoop', () => packageManagerService.updateScoop());
-          break;
-        }
-        case 'Update Chocolatey': {
-          await runPackageUpdate(screen, 'choco', () => packageManagerService.updateChoco());
-          break;
-        }
-        case 'Update Pip': {
-          await runPackageUpdate(screen, 'pip', () => packageManagerService.updatePip());
-          break;
-        }
-        case 'Update PowerShell Modules': {
-          await runPackageUpdate(screen, 'PowerShell Modules', () =>
-            packageManagerService.updatePowerShellModules()
-          );
-          break;
-        }
-        case 'Update All': {
-          await runUpdateAll(screen);
+        case 'Back': {
+          updateDialog.destroy();
+          screen.render();
           break;
         }
       }
     } catch (error) {
       showMessage(screen, 'Error', `Update failed: ${error.message}`);
     }
-
-    updateDialog.destroy();
-    screen.render();
   });
 
   updateDialog.key(['escape'], () => {
@@ -1944,8 +1906,59 @@ async function showUpdateSelection(screen, updates) {
     });
 
     if (selectedUpdates.length > 0) {
-      form.destroy();
-      await runUpdates(screen, selectedUpdates);
+      form.destroy(); // Destroy the selection form before showing the confirmation dialog
+      screen.render();
+
+      showConfirmDialog(
+        screen,
+        'Create Restore Point',
+        'Do you want to create a system restore point before installing updates?',
+        async confirmed => {
+          if (confirmed) {
+            const progressDialog = blessed.loading({
+              top: 'center',
+              left: 'center',
+              width: '50%',
+              height: '20%',
+              border: {
+                type: 'line',
+              },
+              label: ' Creating Restore Point ',
+              style: {
+                border: {
+                  fg: 'red',
+                },
+              },
+            });
+
+            screen.append(progressDialog);
+            progressDialog.load('Creating system restore point...');
+            screen.render();
+
+            try {
+              const success = await systemRestoreService.createRestorePoint(
+                'Before InvolveX CLI Updates'
+              );
+              progressDialog.stop();
+              progressDialog.destroy();
+              screen.render();
+
+              if (success) {
+                showMessage(screen, 'Success', 'System restore point created successfully!');
+              } else {
+                showMessage(screen, 'Error', 'Failed to create system restore point.');
+              }
+            } catch (error) {
+              progressDialog.stop();
+              progressDialog.destroy();
+              screen.render();
+              showMessage(screen, 'Error', `Failed to create restore point: ${error.message}`);
+            }
+          }
+          // Proceed with updates regardless of restore point creation success/failure or user cancellation
+          await runUpdates(screen, selectedUpdates);
+        }
+      );
     } else {
       showMessage(screen, 'No Selection', 'Please select at least one update.');
     }
@@ -2017,251 +2030,29 @@ async function runUpdates(screen, updates) {
   screen.append(progressDialog);
   screen.render();
 
-  const totalUpdates = updates.length;
-  let completedUpdates = 0;
-
-  for (const update of updates) {
-    logBox.log(`Updating ${update.packageName} using ${update.packageManager}...`);
+  // Listen for progress events from autoUpdateService
+  autoUpdateService.on('progress', (message, progress) => {
+    logBox.log(message);
+    progressBar.setProgress(progress);
     screen.render();
+  });
 
-    try {
-      switch (update.packageManager) {
-        case 'winget':
-          await packageManagerService.updateSpecificProgramWithWinget(update.packageId);
-          break;
-        case 'npm':
-          await packageManagerService.updateSpecificProgramWithNpm(update.packageName);
-          break;
-        case 'scoop':
-          await packageManagerService.updateSpecificProgramWithScoop(update.packageName);
-          break;
-        case 'choco':
-          await packageManagerService.updateSpecificProgramWithChoco(update.packageName);
-          break;
-      }
-      logBox.log(`Successfully updated ${update.packageName}.`);
-    } catch (error) {
-      logBox.log(`Failed to update ${update.packageName}: ${error.message}`);
-    }
-
-    completedUpdates++;
-    progressBar.setProgress((completedUpdates / totalUpdates) * 100);
-    screen.render();
+  try {
+    await autoUpdateService.installSelectedUpdates(updates);
+    logBox.log('All selected updates completed.');
+  } catch (error) {
+    logBox.log(`Error during update process: ${error.message}`);
+  } finally {
+    // Remove the listener to prevent memory leaks
+    autoUpdateService.removeAllListeners('progress');
   }
 
-  logBox.log('All updates completed.');
   screen.render();
 
   setTimeout(() => {
     progressDialog.destroy();
     screen.render();
   }, 3000);
-}
-
-async function runPackageUpdate(screen, managerName, updateFunction) {
-  const progressDialog = blessed.loading({
-    top: 'center',
-    left: 'center',
-    width: '50%',
-    height: '20%',
-    border: {
-      type: 'line',
-    },
-    label: ` Updating ${managerName} `,
-    style: {
-      border: {
-        fg: 'green',
-      },
-    },
-  });
-
-  screen.append(progressDialog);
-
-  // Animated loading messages
-  const loadingMessages = [
-    `Initializing ${managerName} update...`,
-    `Connecting to ${managerName} repository...`,
-    `Downloading package information...`,
-    `Installing updates...`,
-    `Finalizing ${managerName} update...`,
-  ];
-
-  let messageIndex = 0;
-  const messageInterval = setInterval(() => {
-    if (messageIndex < loadingMessages.length) {
-      progressDialog.load(loadingMessages[messageIndex]);
-      screen.render();
-      messageIndex++;
-    }
-  }, 1000);
-
-  try {
-    await updateFunction();
-    clearInterval(messageInterval);
-    progressDialog.stop();
-    progressDialog.destroy();
-
-    // Success animation
-    const successDialog = blessed.box({
-      top: 'center',
-      left: 'center',
-      width: '40%',
-      height: '15%',
-      border: {
-        type: 'line',
-      },
-      label: ' Success ',
-      content: `\n${managerName} update completed successfully!\n\nPress any key to continue...`,
-      style: {
-        border: {
-          fg: 'green',
-        },
-        fg: 'green',
-      },
-    });
-
-    screen.append(successDialog);
-    screen.render();
-
-    // Auto-close after 2 seconds
-    setTimeout(() => {
-      successDialog.destroy();
-      screen.render();
-    }, 2000);
-
-    successDialog.key(['enter', 'escape', 'space'], () => {
-      successDialog.destroy();
-      screen.render();
-    });
-    successDialog.focus();
-  } catch (error) {
-    clearInterval(messageInterval);
-    progressDialog.stop();
-    progressDialog.destroy();
-    showMessage(screen, 'Error', `Failed to update ${managerName}: ${error.message}`);
-  }
-}
-
-async function runUpdateAll(screen) {
-  const progressDialog = blessed.loading({
-    top: 'center',
-    left: 'center',
-    width: '60%',
-    height: '25%',
-    border: {
-      type: 'line',
-    },
-    label: ' Updating All Package Managers ',
-    style: {
-      border: {
-        fg: 'green',
-      },
-    },
-  });
-
-  screen.append(progressDialog);
-
-  // Animated loading message
-  let loadingDots = 0;
-  const loadingInterval = setInterval(() => {
-    const dots = '.'.repeat((loadingDots % 4) + 1);
-    progressDialog.load(`Updating all package managers${dots}`);
-    screen.render();
-    loadingDots++;
-  }, 300);
-
-  try {
-    // Check which managers are available
-    const [winget, npm, scoop, choco, pip] = await Promise.all([
-      packageManagerService.isWingetInstalled(),
-      packageManagerService.isNpmInstalled(),
-      packageManagerService.isScoopInstalled(),
-      packageManagerService.isChocoInstalled(),
-      packageManagerService.isPipInstalled(),
-    ]);
-
-    clearInterval(loadingInterval);
-
-    const availableManagers = [];
-    if (winget) availableManagers.push('winget');
-    if (npm) availableManagers.push('npm');
-    if (scoop) availableManagers.push('scoop');
-    if (choco) availableManagers.push('choco');
-    if (pip) availableManagers.push('pip');
-
-    if (availableManagers.length === 0) {
-      progressDialog.stop();
-      progressDialog.destroy();
-      showMessage(
-        screen,
-        'No Package Managers',
-        'No supported package managers found on this system.'
-      );
-      return;
-    }
-
-    // Update all managers
-    const results = [];
-    for (let i = 0; i < availableManagers.length; i++) {
-      const manager = availableManagers[i];
-      const progress = Math.round(((i + 1) / availableManagers.length) * 100);
-      progressDialog.load(
-        `Updating ${manager}... (${i + 1}/${availableManagers.length}) [${progress}%]`
-      );
-      screen.render();
-
-      try {
-        switch (manager) {
-          case 'winget': {
-            await packageManagerService.updateWinget();
-            break;
-          }
-          case 'npm': {
-            await packageManagerService.updateNpm();
-            break;
-          }
-          case 'scoop': {
-            await packageManagerService.updateScoop();
-            break;
-          }
-          case 'choco': {
-            await packageManagerService.updateChoco();
-            break;
-          }
-          case 'pip': {
-            await packageManagerService.updatePip();
-            break;
-          }
-        }
-        results.push(`${manager}: Success`);
-      } catch (error) {
-        results.push(`${manager}: Failed - ${error.message}`);
-      }
-    }
-
-    // Update PowerShell modules
-    progressDialog.load('Updating PowerShell modules... [Finalizing]');
-    screen.render();
-
-    try {
-      await packageManagerService.updatePowerShellModules();
-      results.push('PowerShell Modules: Success');
-    } catch (error) {
-      results.push(`PowerShell Modules: Failed - ${error.message}`);
-    }
-
-    clearInterval(loadingInterval);
-    progressDialog.stop();
-    progressDialog.destroy();
-
-    const resultText = results.join('\n');
-    showMessage(screen, 'Update Results', `Update Complete!\n\n${resultText}`);
-  } catch (error) {
-    if (loadingInterval) clearInterval(loadingInterval);
-    progressDialog.stop();
-    progressDialog.destroy();
-    showMessage(screen, 'Error', `Update process failed: ${error.message}`);
-  }
 }
 
 async function showDisableStartupDialog(screen) {
@@ -4098,6 +3889,45 @@ function showHelpDialog(screen) {
   });
 
   helpDialog.focus();
+}
+
+function showConfirmDialog(screen, title, message, callback) {
+  const confirmDialog = blessed.question({
+    top: 'center',
+    left: 'center',
+    width: '50%',
+    height: '20%',
+    border: {
+      type: 'line',
+    },
+    label: ` {green-fg}${title}{/green-fg} `,
+    content: message,
+    style: {
+      bg: 'black',
+      fg: 'green',
+      border: {
+        fg: 'green',
+      },
+    },
+    keys: true,
+    vi: true,
+  });
+
+  screen.append(confirmDialog);
+  screen.render();
+  confirmDialog.focus();
+
+  confirmDialog.on('submit', result => {
+    confirmDialog.destroy();
+    screen.render();
+    callback(result);
+  });
+
+  confirmDialog.on('cancel', () => {
+    confirmDialog.destroy();
+    screen.render();
+    callback(false);
+  });
 }
 
 // Main function

@@ -354,6 +354,25 @@ class PackageManagerService extends EventEmitter {
       }
     }
 
+    // Check PowerShell module updates
+    // PowerShell is assumed to be installed on Windows, so no explicit isInstalled check
+    try {
+      const powershellUpdates = await Promise.race([
+        this.getPowerShellAvailableUpdatesAsync(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('PowerShell update check timeout')), timeoutMs)
+        ),
+      ]).catch(error => {
+        this.logService.log(`Error getting PowerShell updates: ${error.message}`);
+        return null;
+      });
+      if (powershellUpdates) {
+        availableUpdates.push(...powershellUpdates);
+      }
+    } catch (error) {
+      this.logService.log(`Error getting PowerShell updates: ${error.message}`);
+    }
+
     return availableUpdates;
   }
 
@@ -411,7 +430,7 @@ class PackageManagerService extends EventEmitter {
 
   async getWingetAvailableUpdatesAsync() {
     try {
-      const result = await this.runProcess('winget', ['upgrade']);
+      const result = await this.runProcess('winget', ['upgrade', '--include-unknown']);
 
       if (result.code !== 0) {
         this.logService.log(`Winget command failed with code ${result.code}: ${result.stderr}`);
@@ -664,6 +683,81 @@ class PackageManagerService extends EventEmitter {
       this.logService.log(`Error getting pip available updates: ${error.message}`);
       return null;
     }
+  }
+
+  async getPowerShellAvailableUpdatesAsync() {
+    const updates = [];
+    this.logService.log('Checking for outdated PowerShell modules...');
+
+    // Try with Find-Module -Outdated (PowerShellGet v2)
+    try {
+      const result = await this.runProcess('powershell', [
+        'Find-Module',
+        '-Outdated',
+        '|',
+        'Select-Object',
+        'Name,InstalledVersion,RepositoryVersion',
+        '|',
+        'Format-Table',
+        '-HideTableHeaders',
+      ]);
+
+      if (result.code === 0 && result.stdout) {
+        const lines = result.stdout.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith('Name') && !trimmed.startsWith('----')) {
+            const parts = trimmed.split(/\s+/).filter(part => part.length > 0);
+            if (parts.length >= 3) {
+              updates.push({
+                packageManager: 'powershell',
+                packageName: parts[0],
+                currentVersion: parts[1],
+                availableVersion: parts[2],
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      this.logService.log(`Error checking PowerShellGet v2 outdated modules: ${error.message}`);
+    }
+
+    // Try with Find-PSResource -Outdated (PSResourceGet for PowerShell 7+)
+    try {
+      const result = await this.runProcess('pwsh', [
+        'Find-PSResource',
+        '-Outdated',
+        '|',
+        'Select-Object',
+        'Name,Version,RepositoryVersion',
+        '|',
+        'Format-Table',
+        '-HideTableHeaders',
+      ]);
+
+      if (result.code === 0 && result.stdout) {
+        const lines = result.stdout.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith('Name') && !trimmed.startsWith('----')) {
+            const parts = trimmed.split(/\s+/).filter(part => part.length > 0);
+            if (parts.length >= 3) {
+              updates.push({
+                packageManager: 'powershell',
+                packageName: parts[0],
+                currentVersion: parts[1],
+                availableVersion: parts[2],
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      this.logService.log(`Error checking PSResourceGet outdated modules: ${error.message}`);
+    }
+
+    return updates;
   }
 }
 

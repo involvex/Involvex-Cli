@@ -1,9 +1,12 @@
 const { spawn } = require('child_process');
+const { EventEmitter } = require('events');
 
-class AutoUpdateService {
-  constructor(logService, settingsService) {
+class AutoUpdateService extends EventEmitter {
+  constructor(logService, settingsService, packageManagerService) {
+    super();
     this.logService = logService;
     this.settingsService = settingsService;
+    this.packageManagerService = packageManagerService;
     this.packageName = '@involvex/involvex-cli';
     this.lastCheckTime = null;
   }
@@ -163,6 +166,76 @@ class AutoUpdateService {
     }
 
     return false;
+  }
+
+  async getAllAvailableUpdates() {
+    this.logService.log('Checking for all available updates...');
+    try {
+      const updates = await this.packageManagerService.getAvailableUpdatesAsync();
+      this.logService.log(`Found ${updates.length} available updates.`);
+      return updates;
+    } catch (error) {
+      this.logService.log(`Error getting all available updates: ${error.message}`);
+      return [];
+    }
+  }
+  async installSelectedUpdates(selectedUpdates) {
+    const totalUpdates = selectedUpdates.length;
+    let completedUpdates = 0;
+
+    for (const update of selectedUpdates) {
+      completedUpdates++;
+      const progress = Math.floor((completedUpdates / totalUpdates) * 100);
+      this.emit(
+        'progress',
+        `Updating ${update.packageName} (${update.packageManager})...`,
+        progress
+      );
+
+      try {
+        switch (update.packageManager) {
+          case 'winget':
+            await this.packageManagerService.updateSpecificProgramWithWinget(update.packageId);
+            break;
+          case 'npm':
+            await this.packageManagerService.updateSpecificProgramWithNpm(update.packageName);
+            break;
+          case 'scoop':
+            await this.packageManagerService.updateSpecificProgramWithScoop(update.packageName);
+            break;
+          case 'choco':
+            await this.packageManagerService.updateSpecificProgramWithChoco(update.packageName);
+            break;
+          case 'pip':
+            // Pip update is handled by updatePip() which updates all outdated packages
+            // For specific package update, it's more complex, so we'll just log for now
+            this.logService.log(
+              `Pip specific package update not directly supported via 'updateSpecificProgramWithPip'. Updating all pip packages instead.`
+            );
+            await this.packageManagerService.updatePip();
+            break;
+          case 'powershell':
+            // PowerShell module update is handled by updatePowerShellModules() which updates all outdated modules
+            this.logService.log(
+              `PowerShell specific module update not directly supported via 'updateSpecificProgramWithPowerShell'. Updating all PowerShell modules instead.`
+            );
+            await this.packageManagerService.updatePowerShellModules();
+            break;
+          default:
+            this.logService.log(`Unknown package manager: ${update.packageManager}`);
+            break;
+        }
+        this.logService.log(
+          `Successfully updated ${update.packageName} (${update.packageManager})`
+        );
+      } catch (error) {
+        this.logService.log(
+          `Failed to update ${update.packageName} (${update.packageManager}): ${error.message}`
+        );
+        // Continue with other updates even if one fails
+      }
+    }
+    this.emit('progress', 'All selected updates completed!', 100);
   }
 }
 
