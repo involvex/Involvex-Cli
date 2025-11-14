@@ -636,7 +636,9 @@ class PackageManagerService extends EventEmitter {
                 return updates;
               } catch (jsonError) {
                 // JSON parsing failed, try text format
-                this.logService.log(`JSON parsing failed for ${cmd}, trying text format: ${jsonError.message}`);
+                this.logService.log(
+                  `JSON parsing failed for ${cmd}, trying text format: ${jsonError.message}`
+                );
               }
             }
 
