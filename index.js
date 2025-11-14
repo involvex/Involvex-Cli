@@ -3469,230 +3469,230 @@ async function main() {
     return;
   }
 
-  // Set up command line interface for non-interactive commands
-  const program = new Command();
+  // Parse command line arguments manually for better control
+  const args = process.argv.slice(2);
 
-  program
-    .name('involvex-cli')
-    .description('Windows System Administration Toolkit')
-    .version(VERSION)
-    .allowUnknownOption(false)
-    .allowExcessArguments(false)
-    .configureHelp({
-      helpWidth: 120,
-    });
+  // Check for plugin command first
+  if (args.length > 0 && args[0] === 'plugin') {
+    const program = new Command();
 
-  // Plugin management commands
-  program
-    .command('plugin')
-    .description('Plugin management commands')
-    .argument('[action]', 'Action: list, install, uninstall, update')
-    .argument('[name]', 'Plugin name (for install/uninstall/update)')
-    .option('-p, --path <path>', 'Plugin file path (for install)')
-    .action(async (action, name, options) => {
-      await initializeConfig();
+    program
+      .name('involvex-cli')
+      .description('Windows System Administration Toolkit')
+      .version(VERSION)
+      .allowUnknownOption(false)
+      .allowExcessArguments(false)
+      .configureHelp({
+        helpWidth: 120,
+      });
 
-      if (!action || action === 'list') {
-        try {
-          const plugins = pluginService.getLoadedPlugins();
-          if (plugins.length === 0) {
-            console.log('No plugins installed.');
-          } else {
-            console.log('Installed Plugins:');
-            plugins.forEach(plugin => {
-              console.log(
-                `  ${plugin.name || 'Unknown'} v${plugin.version || '1.0.0'} - ${plugin.description || 'No description'}`
-              );
-            });
-          }
-        } catch (error) {
-          console.error(`Failed to list plugins: ${error.message}`);
-          process.exit(1);
-        }
-      } else if (action === 'install') {
-        if (!options.path && !name) {
-          console.error(
-            'Error: Plugin path required. Use --path <path> or provide plugin file path.'
-          );
-          process.exit(1);
-        }
-        const pluginPath = options.path || name;
-        try {
-          console.log(`Installing plugin from: ${pluginPath}`);
-          const success = await pluginService.installPluginAsync(pluginPath);
-          if (success) {
-            console.log('Plugin installed successfully!');
-          } else {
-            console.error('Failed to install plugin.');
-            process.exit(1);
-          }
-        } catch (error) {
-          console.error(`Failed to install plugin: ${error.message}`);
-          process.exit(1);
-        }
-      } else if (action === 'uninstall') {
-        if (!name) {
-          console.error('Error: Plugin name required.');
-          process.exit(1);
-        }
-        try {
-          console.log(`Uninstalling plugin: ${name}`);
-          const success = await pluginService.uninstallPluginAsync(name);
-          if (success) {
-            console.log('Plugin uninstalled successfully!');
-          } else {
-            console.error('Failed to uninstall plugin.');
-            process.exit(1);
-          }
-        } catch (error) {
-          console.error(`Failed to uninstall plugin: ${error.message}`);
-          process.exit(1);
-        }
-      } else if (action === 'update') {
-        if (!name) {
-          console.error('Error: Plugin name required.');
-          process.exit(1);
-        }
-        try {
-          console.log(`Updating plugin: ${name}`);
-          const uninstalled = await pluginService.uninstallPluginAsync(name);
-          if (uninstalled && options.path) {
-            const installed = await pluginService.installPluginAsync(options.path);
-            if (installed) {
-              console.log('Plugin updated successfully!');
+    program
+      .command('plugin')
+      .description('Plugin management commands')
+      .argument('[action]', 'Action: list, install, uninstall, update')
+      .argument('[name]', 'Plugin name (for install/uninstall/update)')
+      .option('-p, --path <path>', 'Plugin file path (for install)')
+      .action(async (action, name, options) => {
+        await initializeConfig();
+
+        if (!action || action === 'list') {
+          try {
+            const plugins = pluginService.getLoadedPlugins();
+            if (plugins.length === 0) {
+              console.log('No plugins installed.');
             } else {
-              console.error('Failed to reinstall plugin after uninstall.');
+              console.log('Installed Plugins:');
+              plugins.forEach(plugin => {
+                console.log(
+                  `  ${plugin.name || 'Unknown'} v${plugin.version || '1.0.0'} - ${plugin.description || 'No description'}`
+                );
+              });
+            }
+          } catch (error) {
+            console.error(`Failed to list plugins: ${error.message}`);
+            process.exit(1);
+          }
+        } else if (action === 'install') {
+          if (!options.path && !name) {
+            console.error(
+              'Error: Plugin path required. Use --path <path> or provide plugin file path.'
+            );
+            process.exit(1);
+          }
+          const pluginPath = options.path || name;
+          try {
+            console.log(`Installing plugin from: ${pluginPath}`);
+            const success = await pluginService.installPluginAsync(pluginPath);
+            if (success) {
+              console.log('Plugin installed successfully!');
+            } else {
+              console.error('Failed to install plugin.');
               process.exit(1);
             }
-          } else {
-            console.log('Plugin uninstalled. Use "plugin install --path <path>" to reinstall.');
+          } catch (error) {
+            console.error(`Failed to install plugin: ${error.message}`);
+            process.exit(1);
           }
-        } catch (error) {
-          console.error(`Failed to update plugin: ${error.message}`);
+        } else if (action === 'uninstall') {
+          if (!name) {
+            console.error('Error: Plugin name required.');
+            process.exit(1);
+          }
+          try {
+            console.log(`Uninstalling plugin: ${name}`);
+            const success = await pluginService.uninstallPluginAsync(name);
+            if (success) {
+              console.log('Plugin uninstalled successfully!');
+            } else {
+              console.error('Failed to uninstall plugin.');
+              process.exit(1);
+            }
+          } catch (error) {
+            console.error(`Failed to uninstall plugin: ${error.message}`);
+            process.exit(1);
+          }
+        } else if (action === 'update') {
+          if (!name) {
+            console.error('Error: Plugin name required.');
+            process.exit(1);
+          }
+          try {
+            console.log(`Updating plugin: ${name}`);
+            const uninstalled = await pluginService.uninstallPluginAsync(name);
+            if (uninstalled && options.path) {
+              const installed = await pluginService.installPluginAsync(options.path);
+              if (installed) {
+                console.log('Plugin updated successfully!');
+              } else {
+                console.error('Failed to reinstall plugin after uninstall.');
+                process.exit(1);
+              }
+            } else {
+              console.log('Plugin uninstalled. Use "plugin install --path <path>" to reinstall.');
+            }
+          } catch (error) {
+            console.error(`Failed to update plugin: ${error.message}`);
+            process.exit(1);
+          }
+        } else {
+          console.error(`Unknown plugin action: ${action}`);
+          console.log('Available actions: list, install, uninstall, update');
           process.exit(1);
         }
-      } else {
-        console.error(`Unknown plugin action: ${action}`);
-        console.log('Available actions: list, install, uninstall, update');
-        process.exit(1);
-      }
+      });
+
+    await program.parseAsync(process.argv);
+    return;
+  }
+
+  // Handle direct options manually
+  await initializeConfig();
+
+  if (args.includes('--serve')) {
+    const portIndex = args.indexOf('--port');
+    const hostIndex = args.indexOf('--host');
+    const pathIndex = args.indexOf('--path');
+
+    const port =
+      portIndex !== -1 && portIndex + 1 < args.length
+        ? parseInt(args[portIndex + 1], 10)
+        : 3000;
+    const host =
+      hostIndex !== -1 && hostIndex + 1 < args.length
+        ? args[hostIndex + 1]
+        : '0.0.0.0';
+
+    const webServer = new WebServer(logService, {
+      packageManager: packageManagerService,
+      cache: cacheService,
+      startup: startupService,
+      uninstaller: uninstallerService,
+      dns: dnsService,
+      network: networkService,
+      plugin: pluginService,
     });
 
-  // Options for direct command execution
-  program
-    .option('--update', 'Update package managers and packages')
-    .option('--cache', 'Clear system and memory caches')
-    .option('--startup', 'List startup programs')
-    .option('--uninstall', 'List installed programs')
-    .option('--dns', 'Show DNS configuration')
-    .option('--network', 'Run network tests')
-    .option('--driver', 'Check for driver updates')
-    .option('--restore', 'List system restore points')
-    .option('--plugins', 'List installed plugins (use "plugin list" instead)')
-    .option('--serve', 'Start web server interface')
-    .option('--port <port>', 'Port for web server (default: 3000)', '3000')
-    .option('--host <host>', 'Host for web server (default: 0.0.0.0)', '0.0.0.0')
-    .option('--path <path>', 'Path to serve static files (optional)');
-
-  await program.parseAsync(process.argv);
-  const options = program.opts();
-
-  // Since interactive mode is handled above, we just handle the other flags here.
-  if (Object.keys(options).length > 0) {
-    await initializeConfig();
-
-    if (options.serve) {
-      const port = parseInt(options.port, 10);
-      const host = options.host;
-      const webServer = new WebServer(logService, {
-        packageManager: packageManagerService,
-        cache: cacheService,
-        startup: startupService,
-        uninstaller: uninstallerService,
-        dns: dnsService,
-        network: networkService,
-        plugin: pluginService,
-      });
-      if (options.path) {
-        const fs = require('fs');
-        const folderPath = path.resolve(options.path);
-        if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
-          webServer.serveFolder(folderPath);
-          console.log(`Serving folder: ${folderPath}`);
-        } else {
-          console.error(`Error: ${folderPath} is not a directory`);
-          process.exit(1);
-        }
-      }
-      await webServer.start(port, host);
-      console.log(`\n🌐 Web server running at http://${host}:${port}`);
-      console.log('Press Ctrl+C to stop the server\n');
-      process.on('SIGINT', () => webServer.stop().then(() => process.exit(0)));
-      process.on('SIGTERM', () => webServer.stop().then(() => process.exit(0)));
-    } else if (options.update) {
-      console.log('Checking for available updates...');
-      const updates = await packageManagerService.getAvailableUpdatesAsync();
-      if (updates.length === 0) {
-        console.log('No updates available. All packages are up to date!');
+    if (pathIndex !== -1 && pathIndex + 1 < args.length) {
+      const fs = require('fs');
+      const folderPath = path.resolve(args[pathIndex + 1]);
+      if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
+        webServer.serveFolder(folderPath);
+        console.log(`Serving folder: ${folderPath}`);
       } else {
-        console.log(`Found ${updates.length} available update(s):`);
-        updates.forEach(update =>
-          console.log(
-            `${update.packageManager.toUpperCase()}: ${update.packageName} (${update.currentVersion} → ${update.availableVersion})`
-          )
-        );
+        console.error(`Error: ${folderPath} is not a directory`);
+        process.exit(1);
       }
-    } else if (options.cache) {
-      console.log('Clearing system caches...');
-      const success = await cacheService.clearSystemCache();
-      console.log(
-        success ? 'System cache cleared successfully!' : 'Cache clearing not supported or failed.'
-      );
-    } else if (options.startup) {
-      console.log('Listing startup programs...');
-      const programs = await startupService.listStartupPrograms();
-      programs.forEach(program => console.log(`  ${program}`));
-    } else if (options.uninstall) {
-      console.log('Listing installed programs...');
-      const programs = await uninstallerService.listInstalledPrograms();
-      programs.forEach(program => console.log(`  ${program}`));
-    } else if (options.dns) {
-      console.log('DNS Configuration:');
-      const dnsInfo = await dnsService.getCurrentDns();
-      console.log(dnsInfo);
-    } else if (options.network) {
-      console.log('Running network tests...');
-      const pingResult = await networkService.runPingTest('8.8.8.8');
-      console.log('Ping Test Results:');
-      console.log(pingResult);
-    } else if (options.driver) {
-      console.log('Checking for driver updates...');
-      const drivers = await driverService.detectDrivers();
-      drivers.forEach(driver => console.log(`  ${driver}`));
-    } else if (options.restore) {
-      console.log('Listing system restore points...');
-      const restorePoints = await systemRestoreService.listRestorePoints();
-      console.log('System Restore Points:');
-      console.log(restorePoints);
-    } else if (options.plugins) {
-      console.log('Listing installed plugins...');
-      const plugins = pluginService.getLoadedPlugins();
-      if (plugins.length === 0) {
-        console.log('No plugins installed.');
-      } else {
-        console.log('Installed Plugins:');
-        plugins.forEach(plugin =>
-          console.log(
-            `  ${plugin.name || 'Unknown'} v${plugin.version || '1.0.0'} - ${plugin.description || 'No description'}`
-          )
-        );
-      }
-    } else {
-      program.outputHelp();
     }
-  } else if (process.argv.length > 2) {
-    // If arguments were passed but not parsed as an option (e.g., a command that wasn't 'plugin')
-    program.outputHelp();
+
+    await webServer.start(port, host);
+    console.log(`\n🌐 Web server running at http://${host}:${port}`);
+    console.log('Press Ctrl+C to stop the server\n');
+    process.on('SIGINT', () => webServer.stop().then(() => process.exit(0)));
+    process.on('SIGTERM', () => webServer.stop().then(() => process.exit(0)));
+  } else if (args.includes('--update')) {
+    console.log('Checking for available updates...');
+    const updates = await packageManagerService.getAvailableUpdatesAsync();
+    if (updates.length === 0) {
+      console.log('No updates available. All packages are up to date!');
+    } else {
+      console.log(`Found ${updates.length} available update(s):`);
+      updates.forEach(update =>
+        console.log(
+          `${update.packageManager.toUpperCase()}: ${update.packageName} (${update.currentVersion} → ${update.availableVersion})`
+        )
+      );
+    }
+  } else if (args.includes('--cache')) {
+    console.log('Clearing system caches...');
+    const success = await cacheService.clearSystemCache();
+    console.log(
+      success ? 'System cache cleared successfully!' : 'Cache clearing not supported or failed.'
+    );
+  } else if (args.includes('--startup')) {
+    console.log('Listing startup programs...');
+    const programs = await startupService.listStartupPrograms();
+    programs.forEach(program => console.log(`  ${program}`));
+  } else if (args.includes('--uninstall')) {
+    console.log('Listing installed programs...');
+    const programs = await uninstallerService.listInstalledPrograms();
+    programs.forEach(program => console.log(`  ${program}`));
+  } else if (args.includes('--dns')) {
+    console.log('DNS Configuration:');
+    const dnsInfo = await dnsService.getCurrentDns();
+    console.log(dnsInfo);
+  } else if (args.includes('--network')) {
+    console.log('Running network tests...');
+    const pingResult = await networkService.runPingTest('8.8.8.8');
+    console.log('Ping Test Results:');
+    console.log(pingResult);
+  } else if (args.includes('--driver')) {
+    console.log('Checking for driver updates...');
+    const drivers = await driverService.detectDrivers();
+    drivers.forEach(driver => console.log(`  ${driver}`));
+  } else if (args.includes('--restore')) {
+    console.log('Listing system restore points...');
+    const restorePoints = await systemRestoreService.listRestorePoints();
+    console.log('System Restore Points:');
+    console.log(restorePoints);
+  } else if (args.includes('--plugins')) {
+    console.log('Listing installed plugins...');
+    const plugins = pluginService.getLoadedPlugins();
+    if (plugins.length === 0) {
+      console.log('No plugins installed.');
+    } else {
+      console.log('Installed Plugins:');
+      plugins.forEach(plugin =>
+        console.log(
+          `  ${plugin.name || 'Unknown'} v${plugin.version || '1.0.0'} - ${plugin.description || 'No description'}`
+        )
+      );
+    }
+  } else if (args.length > 0) {
+    // Show help for unrecognized commands
+    showHelp();
+  } else {
+    // No arguments provided, show help
+    showHelp();
   }
 }
 
