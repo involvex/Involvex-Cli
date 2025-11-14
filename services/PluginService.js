@@ -260,6 +260,10 @@ class PluginService {
 
   async uninstallPluginAsync(pluginName) {
     try {
+      // Get metadata before unloading (since unloadPluginAsync deletes it)
+      const metadata = this.pluginMetadata.get(pluginName);
+      const pluginPath = metadata ? metadata.path : null;
+
       // Unload the plugin
       const unloaded = await this.unloadPluginAsync(pluginName);
       if (!unloaded) {
@@ -267,10 +271,9 @@ class PluginService {
       }
 
       // Remove the plugin file
-      const metadata = this.pluginMetadata.get(pluginName);
-      if (metadata && metadata.path !== 'Built-in') {
+      if (pluginPath && pluginPath !== 'Built-in') {
         try {
-          await fs.unlink(metadata.path);
+          await fs.unlink(pluginPath);
         } catch (error) {
           this.logService.log(`Warning: Could not delete plugin file: ${error.message}`);
         }

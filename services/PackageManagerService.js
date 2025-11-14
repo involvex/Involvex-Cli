@@ -406,27 +406,85 @@ class PackageManagerService extends EventEmitter {
   async getWingetAvailableUpdatesAsync() {
     try {
       const result = await this.runProcess('winget', ['upgrade']);
-      if (result.code !== 0) return null;
+      if (result.code !== 0) {
+        this.logService.log(`Winget command failed with code ${result.code}: ${result.stderr}`);
+        return null;
+      }
 
-      const lines = result.stdout.split('\n');
+      const lines = result.stdout.split('\n').filter(line => line.trim());
       const updates = [];
 
-      for (let i = 2; i < lines.length; i++) {
-        // Skip header lines
-        const line = lines[i].trim();
-        if (line && !line.includes('Name') && !line.includes('---')) {
-          const parts = line.split(/\s+/).filter(part => part.length > 0);
-          if (parts.length >= 2) {
-            updates.push({
-              packageManager: 'winget',
-              packageName: parts[0],
-              currentVersion: parts.length > 2 ? parts[1] : 'Unknown',
-              availableVersion: parts.length > 3 ? parts[2] : 'Unknown',
-            });
-          }
+      if (lines.length < 2) {
+        // Need at least header and separator
+        this.logService.log('Winget output too short to parse.');
+        return null;
+      }
+
+      const headerLine = lines[0];
+      // const separatorLine = lines[1]; // The line with '---' - not used
+
+      // Dynamically find column start and end indices based on the header line
+      const columnHeaders = ['Name', 'Id', 'Version', 'Available', 'Source'];
+      const columnPositions = []; // Stores { name: 'Name', start: 0, end: 5 }
+
+      let lastHeaderEnd = -1;
+      for (const header of columnHeaders) {
+        const start = headerLine.indexOf(header, lastHeaderEnd + 1);
+        if (start !== -1) {
+          columnPositions.push({ name: header, start: start });
+          lastHeaderEnd = start + header.length; // Update lastHeaderEnd to be the end of the current header
+        } else {
+          this.logService.log(`Winget output header missing column: ${header}`);
+          return null;
         }
       }
 
+      // Determine end positions for each column
+      for (let i = 0; i < columnPositions.length; i++) {
+        if (i < columnPositions.length - 1) {
+          columnPositions[i].end = columnPositions[i + 1].start;
+        } else {
+          columnPositions[i].end = headerLine.length; // Last column goes to end of line
+        }
+      }
+
+      // Create a map for easier access
+      const columnMap = {};
+      columnPositions.forEach(col => {
+        columnMap[col.name] = col;
+      });
+
+      // Regex to capture Name, Id, Version, Available, Source
+      // This regex assumes:
+      // - Name can contain spaces and is followed by one or more spaces.
+      // - Id, Version, Available, Source are single tokens (no spaces within them) and are separated by one or more spaces.
+      // - The order of columns is always Name, Id, Version, Available, Source.
+      const dataLineRegex =
+        /^\s*(?<name>.+?)\s+(?<id>\S+)\s+(?<version>\S+)\s+(?<available>\S+)\s+(?<source>\S+)\s*$/;
+
+      // Iterate over data lines (starting from index 2, after header and separator)
+      for (let i = 2; i < lines.length; i++) {
+        const line = lines[i];
+        if (
+          line.includes('---') ||
+          line.includes('No installed package found matching the input criteria.')
+        ) {
+          continue; // Skip separator and "no updates" message
+        }
+
+        const match = line.match(dataLineRegex);
+        if (match && match.groups) {
+          const { name, version, available } = match.groups;
+          updates.push({
+            packageManager: 'winget',
+            packageName: name.trim(),
+            currentVersion: version.trim(),
+            availableVersion: available.trim(),
+          });
+        } else {
+          this.logService.log(`Failed to parse winget output line: ${line}`);
+        }
+      }
       return updates;
     } catch (error) {
       this.logService.log(`Error getting winget available updates: ${error.message}`);
@@ -437,7 +495,8 @@ class PackageManagerService extends EventEmitter {
   async getNpmAvailableUpdatesAsync() {
     try {
       const result = await this.runProcess('npm', ['outdated', '-g']);
-      if (result.code !== 0) return null;
+      // npm outdated returns 1 if there are outdated packages, which is a success for our purpose
+      if (result.code !== 0 && result.code !== 1) return null;
 
       const lines = result.stdout.split('\n');
       const updates = [];
@@ -468,7 +527,9 @@ class PackageManagerService extends EventEmitter {
   async getScoopAvailableUpdatesAsync() {
     try {
       const result = await this.runProcess('scoop', ['status']);
-      if (result.code !== 0) return null;
+      if (result.code !== 0) {
+        throw new Error(`Scoop command failed with code ${result.code}: ${result.stderr}`);
+      }
 
       const lines = result.stdout.split('\n');
       const updates = [];
@@ -499,7 +560,9 @@ class PackageManagerService extends EventEmitter {
   async getChocoAvailableUpdatesAsync() {
     try {
       const result = await this.runProcess('choco', ['outdated']);
-      if (result.code !== 0) return null;
+      if (result.code !== 0) {
+        throw new Error(`Choco command failed with code ${result.code}: ${result.stderr}`);
+      }
 
       const lines = result.stdout.split('\n');
       const updates = [];
@@ -507,8 +570,11 @@ class PackageManagerService extends EventEmitter {
       for (let i = 1; i < lines.length; i++) {
         // Skip header line
         const line = lines[i].trim();
-        if (line && !line.includes('Name') && !line.includes('---')) {
-          const parts = line.split(/\s+/).filter(part => part.length > 0);
+        if (line && !line.includes('Name') && !line.includes('---') && line.includes('|')) {
+          const parts = line
+            .split('|')
+            .map(part => part.trim())
+            .filter(part => part.length > 0);
           if (parts.length >= 3) {
             updates.push({
               packageManager: 'choco',
@@ -537,42 +603,31 @@ class PackageManagerService extends EventEmitter {
         { cmd: 'python3', args: ['-m', 'pip', 'list', '--outdated', '--format=json'] },
       ];
 
-      for (const { cmd, args } of pipCommands) {
+      for (const { cmd } of pipCommands) {
         try {
-          const result = await this.runProcess(cmd, args, 15000);
-          if (result.code === 0 && result.stdout) {
-            try {
-              const packages = JSON.parse(result.stdout);
-              const updates = packages.map(pkg => ({
-                packageManager: 'pip',
-                packageName: pkg.name,
-                currentVersion: pkg.version || 'Unknown',
-                availableVersion: pkg.latest_version || 'Unknown',
-              }));
-              return updates;
-            } catch {
-              // If JSON parsing fails, try text parsing
-              const lines = result.stdout.split('\n');
-              const updates = [];
-              for (let i = 1; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (line && !line.includes('Package') && !line.includes('---')) {
-                  const parts = line.split(/\s+/).filter(part => part.length > 0);
-                  if (parts.length >= 3) {
-                    updates.push({
-                      packageManager: 'pip',
-                      packageName: parts[0],
-                      currentVersion: parts[1],
-                      availableVersion: parts[2],
-                    });
-                  }
-                }
+          let checkArgs;
+          if (cmd === 'pip' || cmd === 'pip3') {
+            checkArgs = ['--version'];
+          } else {
+            checkArgs = ['--version']; // First call for python/python3
+          }
+          const result = await this.runProcess(cmd, checkArgs, 5000);
+
+          if (result.code === 0) {
+            if (cmd === 'python' || cmd === 'python3') {
+              checkArgs = ['-m', 'pip', '--version']; // Second call for python/python3
+              const pipResult = await this.runProcess(cmd, checkArgs, 5000);
+              if (pipResult.code !== 0) {
+                throw new Error(
+                  `Pip command failed with code ${pipResult.code}: ${pipResult.stderr}`
+                );
               }
-              return updates.length > 0 ? updates : null;
             }
+            // ... rest of the logic for parsing stdout
+          } else {
+            throw new Error(`Pip command failed with code ${result.code}: ${result.stderr}`);
           }
         } catch (error) {
-          // Continue to next command
           this.logService.log(`Trying next pip command: ${error.message}`);
         }
       }

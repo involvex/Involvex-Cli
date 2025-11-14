@@ -9,7 +9,7 @@
   "scripts": {
     "start": "start powershell -NoExit -Command \"$env:FORCE_INTERACTIVE='true'; node index.js --interactive\"",
     "dev": "node index.js",
-    "test": "jest --all",
+    "test": "jest --max-old-space-size=4096",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "lint": "eslint . --ext .js",

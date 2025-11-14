@@ -188,6 +188,7 @@ class WebServer {
           resolve();
         });
       } else {
+        this.logService.log('Web server stopped');
         resolve();
       }
     });
