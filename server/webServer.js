@@ -10,8 +10,11 @@ class WebServer {
   }
 
   setupRoutes() {
+    // Middleware
+    this.app.use(express.json({ limit: '10mb' }));
+    this.app.use(express.urlencoded({ extended: true }));
+
     // Serve static files if folder is provided
-    this.app.use(express.json());
     this.app.use(express.static('public'));
     // Serve favicon
     this.app.use('/favicon.png', express.static('favicon.png'));
@@ -30,6 +33,7 @@ class WebServer {
           'Uninstall',
           'DNS',
           'Network',
+          'Speedtest',
           'Driver',
           'System Restore',
           'Storage Manager',
@@ -148,6 +152,80 @@ class WebServer {
       }
     });
 
+    this.app.post('/api/network/speedtest', async (req, res) => {
+      try {
+        const { exec } = require('child_process');
+        const util = require('util');
+        const execAsync = util.promisify(exec);
+
+        // Try multiple speedtest commands in order of preference
+        const commands = [
+          'speedtest --json --accept-license', // Official Ookla speedtest
+          'speedtest-cli --json', // Alternative speedtest-cli
+          'fast --json', // Fast.com speedtest
+        ];
+
+        let result = null;
+        let lastError = null;
+
+        for (const command of commands) {
+          try {
+            console.log(`Trying speedtest command: ${command}`);
+            const { stdout, stderr } = await execAsync(command, { timeout: 120000 });
+
+            if (stderr && !stdout) {
+              console.log(`Command ${command} stderr:`, stderr);
+              lastError = stderr;
+              continue;
+            }
+
+            // Try to parse JSON output
+            try {
+              result = JSON.parse(stdout);
+              console.log(`Command ${command} succeeded`);
+              break;
+            } catch {
+              console.log(`Command ${command} output is not JSON:`, stdout);
+              // If not JSON, try to extract speed info from text
+              const downloadMatch = stdout.match(/Download:\s*([\d.]+)\s*(Mbps|MBit\/s|MB\/s)/i);
+              const uploadMatch = stdout.match(/Upload:\s*([\d.]+)\s*(Mbps|MBit\/s|MB\/s)/i);
+              const pingMatch = stdout.match(/Ping:\s*([\d.]+)\s*ms/i);
+
+              if (downloadMatch || uploadMatch || pingMatch) {
+                result = {
+                  download: downloadMatch ? parseFloat(downloadMatch[1]) * 1000000 : 0,
+                  upload: uploadMatch ? parseFloat(uploadMatch[1]) * 1000000 : 0,
+                  ping: pingMatch ? parseFloat(pingMatch[1]) : 0,
+                  server: { name: 'Unknown', sponsor: 'Unknown' },
+                  timestamp: new Date().toISOString(),
+                  bytes_sent: 0,
+                  bytes_received: 0,
+                  client: { ip: 'Unknown' },
+                };
+                console.log(`Parsed text output from ${command}`);
+                break;
+              }
+              lastError = `Could not parse output: ${stdout}`;
+            }
+          } catch (cmdError) {
+            console.log(`Command ${command} failed:`, cmdError.message);
+            lastError = cmdError.message;
+          }
+        }
+
+        if (result) {
+          res.json({ success: true, result });
+        } else {
+          res.json({
+            success: false,
+            error: `All speedtest commands failed. Last error: ${lastError}. Please install speedtest-cli or fast.com CLI.`,
+          });
+        }
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+
     this.app.get('/api/plugins', async (req, res) => {
       try {
         const plugins = this.services.plugin.getLoadedPlugins();
@@ -233,6 +311,63 @@ class WebServer {
         const { items } = req.body;
         const result = await this.services.storageManager.deleteItems(items);
         res.json({ success: true, result });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+
+    // Settings API endpoints
+    this.app.get('/api/settings', async (req, res) => {
+      try {
+        const settings = this.services.settings.getSettings();
+        res.json({ success: true, settings });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+
+    this.app.post('/api/settings', async (req, res) => {
+      try {
+        const { updates } = req.body;
+        this.services.settings.updateSettings(updates);
+        const success = await this.services.settings.saveSettingsAsync();
+        res.json({ success });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+
+    // Test route
+    this.app.post('/api/test', (req, res) => {
+      console.log('Raw body:', req.rawBody);
+      console.log('Parsed body:', req.body);
+      res.json({ body: req.body, hasBody: !!req.body, rawBody: req.rawBody });
+    });
+
+    // Individual package update endpoint
+    this.app.post('/api/update/package/:packageName', async (req, res) => {
+      try {
+        const { packageName } = req.params;
+        const packageManager = req.body ? req.body.packageManager : null;
+        let result = false;
+
+        if (!packageManager) {
+          return res.json({ success: false, error: 'packageManager is required in request body' });
+        }
+
+        // Find the update in available updates
+        const updates = await this.services.packageManager.getAvailableUpdatesAsync();
+        const update = updates.find(
+          u => u.packageName === packageName && u.packageManager === packageManager
+        );
+
+        if (update) {
+          // Use the auto update service to install this specific update
+          await this.services.autoUpdate.installSelectedUpdates([update]);
+          result = true;
+        }
+
+        res.json({ success: result });
       } catch (error) {
         res.json({ success: false, error: error.message });
       }
@@ -470,6 +605,63 @@ class WebServer {
             color: #00ff00;
             font-weight: bold;
         }
+        .speedtest-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .speed-gauge {
+            width: 200px;
+            height: 200px;
+            margin: 20px auto;
+            border-radius: 50%;
+            border: 4px solid #00ff00;
+            position: relative;
+            display: inline-block;
+        }
+        .speed-gauge::after {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            width: 4px;
+            height: 80px;
+            background: #00ff00;
+            transform-origin: bottom center;
+            transform: rotate(0deg);
+            transition: transform 0.5s ease;
+        }
+        .speed-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            font-weight: bold;
+            color: #00ff00;
+        }
+        .speed-label {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: #00ff88;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #00ff00;
+            border-radius: 10px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #00ff88);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
     </style>
 </head>
 <body>
@@ -500,7 +692,7 @@ class WebServer {
 
               Windows System Administration Toolkit\`;
         document.getElementById('asciiLogo').textContent = asciiLogo;
-        
+
         const matrixBg = document.getElementById('matrixBg');
         const chars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
         const numChars = 50;
@@ -514,8 +706,8 @@ class WebServer {
             char.style.fontSize = Math.random() * 10 + 10 + 'px';
             matrixBg.appendChild(char);
         }
-        
-        const menuItems = ['Update', 'Cache', 'Startup', 'Uninstall', 'DNS', 'Network', 'Driver', 'System Restore', 'Storage Manager', 'Plugins', 'Settings'];
+
+        const menuItems = ['Update', 'Cache', 'Startup', 'Uninstall', 'DNS', 'Network', 'Speedtest', 'Driver', 'System Restore', 'Storage Manager', 'Plugins', 'Settings'];
         const menu = document.getElementById('menu');
         const content = document.getElementById('content');
 
@@ -532,27 +724,7 @@ class WebServer {
             try {
                 switch(item) {
                     case 'Update':
-                        const updates = await fetch('/api/updates').then(r => r.json());
-                        const cliUpdates = await fetch('/api/cli-updates').then(r => r.json());
-                        let html = '<h2>Available Updates</h2>';
-
-                        if (cliUpdates.success && cliUpdates.updateInfo.hasUpdate) {
-                            html += '<h3>CLI Updates</h3>';
-                            html += '<p>Latest version: ' + cliUpdates.updateInfo.latestVersion + '</p>';
-                            html += '<p>' + cliUpdates.updateInfo.description + '</p>';
-                            html += '<button onclick="installCliUpdate()">Install CLI Update</button>';
-                        } else {
-                            html += '<h3>CLI Updates</h3><p>No CLI updates available</p>';
-                        }
-
-                        if (updates.success && updates.updates.length > 0) {
-                            html += '<h3>Package Manager Updates</h3>';
-                            html += '<pre>' + JSON.stringify(updates.updates, null, 2) + '</pre>';
-                        } else {
-                            html += '<h3>Package Manager Updates</h3><p>No package updates available</p>';
-                        }
-
-                        content.innerHTML = html;
+                        await loadUpdates();
                         break;
                     case 'Cache':
                         content.innerHTML = '<h2>Cache Management</h2><button onclick="clearCache()">Clear System Cache</button><button onclick="clearMemory()">Clear Memory</button>';
@@ -584,6 +756,22 @@ class WebServer {
                     case 'Network':
                         content.innerHTML = '<h2>Network Tools</h2><button onclick="runPing()">Run Ping Test</button>';
                         break;
+                    case 'Speedtest':
+                        content.innerHTML = \`
+                            <h2>Internet Speed Test</h2>
+                            <div class="speedtest-container">
+                                <div class="speed-gauge" id="speedGauge">
+                                    <div class="speed-value" id="speedValue">0</div>
+                                    <div class="speed-label" id="speedLabel">Mbps</div>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progressFill"></div>
+                                </div>
+                                <p id="speedStatus">Click to start speed test</p>
+                                <button onclick="runSpeedtest()">Start Speed Test</button>
+                            </div>
+                        \`;
+                        break;
                     case 'Plugins':
                         const plugins = await fetch('/api/plugins').then(r => r.json());
                         if (plugins.success) {
@@ -609,7 +797,7 @@ class WebServer {
                         content.innerHTML = '<h2>System Restore</h2><p>System restore functionality</p>';
                         break;
                     case 'Settings':
-                        content.innerHTML = '<h2>Settings</h2><p>Settings management</p>';
+                        await loadSettings();
                         break;
                     default:
                         content.innerHTML = '<h2>' + item + '</h2><p>Feature coming soon...</p>';
@@ -632,6 +820,58 @@ class WebServer {
         async function runPing() {
             const result = await fetch('/api/network/ping', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({host: '8.8.8.8'}) }).then(r => r.json());
             content.innerHTML = '<h2>Ping Results</h2><pre>' + JSON.stringify(result, null, 2) + '</pre>';
+        }
+
+        async function runSpeedtest() {
+            const speedValue = document.getElementById('speedValue');
+            const speedLabel = document.getElementById('speedLabel');
+            const progressFill = document.getElementById('progressFill');
+            const speedStatus = document.getElementById('speedStatus');
+            const speedGauge = document.getElementById('speedGauge');
+
+            speedStatus.textContent = 'Initializing speed test...';
+            progressFill.style.width = '10%';
+
+            try {
+                // Start the speed test
+                const response = await fetch('/api/network/speedtest', { method: 'POST' });
+
+                if (!response.ok) {
+                    throw new Error('Speed test failed to start');
+                }
+
+                speedStatus.textContent = 'Running speed test...';
+                progressFill.style.width = '50%';
+
+                const result = await response.json();
+
+                if (result.success) {
+                    const downloadSpeed = (result.result.download / 1000000).toFixed(2); // Convert to Mbps
+                    speedValue.textContent = downloadSpeed;
+                    speedStatus.textContent = 'Speed test completed!';
+                    progressFill.style.width = '100%';
+
+                    // Animate the gauge needle
+                    const maxSpeed = 100; // Assume 100 Mbps max for gauge
+                    const angle = Math.min((downloadSpeed / maxSpeed) * 180, 180);
+                    speedGauge.style.setProperty('--needle-rotation', angle + 'deg');
+
+                    setTimeout(() => {
+                        speedStatus.innerHTML = \`
+                            <strong>Results:</strong><br>
+                            Download: \${downloadSpeed} Mbps<br>
+                            Upload: \${(result.result.upload / 1000000).toFixed(2)} Mbps<br>
+                            Ping: \${result.result.ping} ms
+                        \`;
+                    }, 1000);
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                speedStatus.textContent = 'Speed test failed: ' + error.message;
+                progressFill.style.width = '0%';
+                speedValue.textContent = '0';
+            }
         }
 
         async function installCliUpdate() {
@@ -662,6 +902,149 @@ class WebServer {
                 } else {
                     content.innerHTML = '<p class="error">Error: ' + result.error + '</p>';
                 }
+            }
+        }
+
+        async function loadUpdates() {
+            const updates = await fetch('/api/updates').then(r => r.json());
+            const cliUpdates = await fetch('/api/cli-updates').then(r => r.json());
+            let html = '<h2>Available Updates</h2>';
+
+            if (cliUpdates.success && cliUpdates.updateInfo.hasUpdate) {
+                html += '<h3>CLI Updates</h3>';
+                html += '<p>Latest version: ' + cliUpdates.updateInfo.latestVersion + '</p>';
+                html += '<p>' + cliUpdates.updateInfo.description + '</p>';
+                html += '<button onclick="installCliUpdate()">Install CLI Update</button>';
+            } else {
+                html += '<h3>CLI Updates</h3><p>No CLI updates available</p>';
+            }
+
+            if (updates.success && updates.updates.length > 0) {
+                html += '<h3>Package Manager Updates</h3>';
+                updates.updates.forEach(update => {
+                    html += '<div style="margin: 10px 0; padding: 10px; border: 1px solid #00ff00; border-radius: 4px;">';
+                    html += '<strong>' + update.packageManager.toUpperCase() + ':</strong> ' + update.packageName + '<br>';
+                    html += '<small>Current: ' + update.currentVersion + ' → Latest: ' + update.availableVersion + '</small><br>';
+                    html += '<button onclick="updatePackage(\\"' + update.packageName.replace(/'/g, '&#39;') + '\\", \\"' + update.packageManager + '\\")">Update This Package</button>';
+                    html += '</div>';
+                });
+            } else {
+                html += '<h3>Package Manager Updates</h3><p>No package updates available</p>';
+            }
+
+            content.innerHTML = html;
+        }
+
+        async function updatePackage(packageName, packageManager) {
+            const result = await fetch('/api/update/package/' + encodeURIComponent(packageName), {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ packageManager })
+            }).then(r => r.json());
+            if (result.success) {
+                alert('Package ' + packageName + ' updated successfully!');
+                loadUpdates(); // Refresh the updates list
+            } else {
+                alert('Failed to update package: ' + result.error);
+            }
+        }
+
+        async function loadSettings() {
+            const settingsResponse = await fetch('/api/settings').then(r => r.json());
+            if (!settingsResponse.success) {
+                content.innerHTML = '<p class="error">Error loading settings: ' + settingsResponse.error + '</p>';
+                return;
+            }
+
+            const settings = settingsResponse.settings;
+            let html = '<h2>Settings</h2>';
+            html += '<form onsubmit="saveSettings(event)">';
+
+            // Auto Update CLI
+            html += '<h3>CLI Auto-Update</h3>';
+            html += '<label><input type="checkbox" id="autoUpdateEnabled" ' + (settings.autoUpdate?.enabled ? 'checked' : '') + '> Enable Auto-Update</label><br>';
+            html += '<label><input type="checkbox" id="autoUpdateAutoInstall" ' + (settings.autoUpdate?.autoInstall ? 'checked' : '') + '> Auto-Install Updates</label><br>';
+            html += '<label>Check Interval (hours): <input type="number" id="autoUpdateInterval" value="' + (settings.autoUpdate?.checkIntervalHours || 24) + '"></label><br><br>';
+
+            // Package Auto-Update
+            html += '<h3>Package Auto-Update</h3>';
+            html += '<label><input type="checkbox" id="packageAutoUpdateEnabled" ' + (settings.packageAutoUpdate?.enabled ? 'checked' : '') + '> Enable Package Auto-Update</label><br>';
+            html += '<label><input type="checkbox" id="wingetEnabled" ' + (settings.packageAutoUpdate?.managers?.winget ? 'checked' : '') + '> Winget</label><br>';
+            html += '<label><input type="checkbox" id="npmEnabled" ' + (settings.packageAutoUpdate?.managers?.npm ? 'checked' : '') + '> NPM</label><br>';
+            html += '<label><input type="checkbox" id="scoopEnabled" ' + (settings.packageAutoUpdate?.managers?.scoop ? 'checked' : '') + '> Scoop</label><br>';
+            html += '<label><input type="checkbox" id="chocoEnabled" ' + (settings.packageAutoUpdate?.managers?.choco ? 'checked' : '') + '> Chocolatey</label><br>';
+            html += '<label><input type="checkbox" id="pipEnabled" ' + (settings.packageAutoUpdate?.managers?.pip ? 'checked' : '') + '> Pip</label><br>';
+            html += '<label>Check Interval (hours): <input type="number" id="packageAutoUpdateInterval" value="' + (settings.packageAutoUpdate?.checkIntervalHours || 24) + '"></label><br><br>';
+
+            // Auto Cache Clearing
+            html += '<h3>Auto Cache Clearing</h3>';
+            html += '<label><input type="checkbox" id="autoCacheEnabled" ' + (settings.autoCacheClearing?.enabled ? 'checked' : '') + '> Enable Auto Cache Clearing</label><br>';
+            html += '<label>Interval (hours): <input type="number" id="autoCacheInterval" value="' + (settings.autoCacheClearing?.intervalHours || 168) + '"></label><br><br>';
+
+            // Auto Memory Clearing
+            html += '<h3>Auto Memory Clearing</h3>';
+            html += '<label><input type="checkbox" id="autoMemoryEnabled" ' + (settings.autoMemoryClearing?.enabled ? 'checked' : '') + '> Enable Auto Memory Clearing</label><br>';
+            html += '<label>Threshold (MB): <input type="number" id="autoMemoryThreshold" value="' + (settings.autoMemoryClearing?.thresholdMB || 4096) + '"></label><br>';
+            html += '<label>Interval (minutes): <input type="number" id="autoMemoryInterval" value="' + (settings.autoMemoryClearing?.intervalMinutes || 60) + '"></label><br><br>';
+
+            // Discord RPC
+            html += '<h3>Discord Rich Presence</h3>';
+            html += '<label><input type="checkbox" id="discordRPCEnabled" ' + (settings.discordRPC?.enabled ? 'checked' : '') + '> Enable Discord RPC</label><br>';
+            html += '<label>Client ID: <input type="text" id="discordRPCClientId" value="' + (settings.discordRPC?.clientId || '') + '"></label><br>';
+            html += '<label>Update Interval (seconds): <input type="number" id="discordRPCInterval" value="' + (settings.discordRPC?.updateIntervalSeconds || 15) + '"></label><br><br>';
+
+            html += '<button type="submit">Save Settings</button>';
+            html += '</form>';
+
+            content.innerHTML = html;
+        }
+
+        async function saveSettings(event) {
+            event.preventDefault();
+
+            const updates = {
+                autoUpdate: {
+                    enabled: document.getElementById('autoUpdateEnabled').checked,
+                    autoInstall: document.getElementById('autoUpdateAutoInstall').checked,
+                    checkIntervalHours: parseInt(document.getElementById('autoUpdateInterval').value)
+                },
+                packageAutoUpdate: {
+                    enabled: document.getElementById('packageAutoUpdateEnabled').checked,
+                    managers: {
+                        winget: document.getElementById('wingetEnabled').checked,
+                        npm: document.getElementById('npmEnabled').checked,
+                        scoop: document.getElementById('scoopEnabled').checked,
+                        choco: document.getElementById('chocoEnabled').checked,
+                        pip: document.getElementById('pipEnabled').checked
+                    },
+                    checkIntervalHours: parseInt(document.getElementById('packageAutoUpdateInterval').value)
+                },
+                autoCacheClearing: {
+                    enabled: document.getElementById('autoCacheEnabled').checked,
+                    intervalHours: parseInt(document.getElementById('autoCacheInterval').value)
+                },
+                autoMemoryClearing: {
+                    enabled: document.getElementById('autoMemoryEnabled').checked,
+                    thresholdMB: parseInt(document.getElementById('autoMemoryThreshold').value),
+                    intervalMinutes: parseInt(document.getElementById('autoMemoryInterval').value)
+                },
+                discordRPC: {
+                    enabled: document.getElementById('discordRPCEnabled').checked,
+                    clientId: document.getElementById('discordRPCClientId').value,
+                    updateIntervalSeconds: parseInt(document.getElementById('discordRPCInterval').value)
+                }
+            };
+
+            const result = await fetch('/api/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ updates })
+            }).then(r => r.json());
+
+            if (result.success) {
+                alert('Settings saved successfully!');
+            } else {
+                alert('Failed to save settings: ' + result.error);
             }
         }
     </script>

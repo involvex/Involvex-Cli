@@ -3959,6 +3959,8 @@ async function main() {
       network: networkService,
       plugin: pluginService,
       storageManager: storageManagerService,
+      settings: settingsService,
+      autoUpdate: autoUpdateService,
     });
 
     if (pathIndex !== -1 && pathIndex + 1 < process.argv.length) {
@@ -4153,6 +4155,8 @@ async function main() {
       network: networkService,
       plugin: pluginService,
       storageManager: storageManagerService,
+      settings: settingsService,
+      autoUpdate: autoUpdateService,
     });
 
     if (pathIndex !== -1 && pathIndex + 1 < args.length) {
