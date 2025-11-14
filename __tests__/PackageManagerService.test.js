@@ -449,9 +449,14 @@ packageB|3.0.0|4.0.0|`,
   });
 
   describe('getPipAvailableUpdatesAsync', () => {
-    test.skip('should parse pip outdated output (JSON format) correctly', async () => {
-      // Skipped: Implementation is incomplete (always returns null)
+    test('should parse pip outdated output (JSON format) correctly', async () => {
       // Mock runProcess for the first successful pip command (e.g., 'pip')
+      runProcessSpy.mockResolvedValueOnce({
+        code: 0,
+        stdout: 'pip 20.0.0',
+        stderr: '',
+      });
+      // Mock the JSON format pip list --outdated command
       runProcessSpy.mockResolvedValueOnce({
         code: 0,
         stdout: `[{"name": "pip_packageA", "version": "1.0", "latest_version": "2.0"}, {"name": "pip_packageB", "version": "3.0", "latest_version": "4.0"}]`,
@@ -475,14 +480,18 @@ packageB|3.0.0|4.0.0|`,
       ]);
     });
 
-    test.skip('should parse pip outdated output (text format) correctly if JSON fails', async () => {
-      // Skipped: Implementation is incomplete (always returns null)
-      // Mock runProcess: first call is --version check, second is the actual list command
+    test('should parse pip outdated output (text format) correctly if JSON fails', async () => {
+      // Mock runProcess: first call is --version check, second is JSON command that fails, third is text command
       runProcessSpy
         .mockResolvedValueOnce({
           code: 0,
           stdout: 'pip 20.0.0',
           stderr: '',
+        })
+        .mockResolvedValueOnce({
+          code: 1,
+          stdout: '',
+          stderr: 'JSON format not supported',
         })
         .mockResolvedValueOnce({
           code: 0,

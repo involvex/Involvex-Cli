@@ -595,7 +595,7 @@ class PackageManagerService extends EventEmitter {
 
   async getPipAvailableUpdatesAsync() {
     try {
-      // Try different pip commands
+      // Try different pip commands with JSON format first
       const pipCommands = [
         { cmd: 'pip', args: ['list', '--outdated', '--format=json'] },
         { cmd: 'pip3', args: ['list', '--outdated', '--format=json'] },
@@ -603,7 +603,7 @@ class PackageManagerService extends EventEmitter {
         { cmd: 'python3', args: ['-m', 'pip', 'list', '--outdated', '--format=json'] },
       ];
 
-      for (const { cmd } of pipCommands) {
+      for (const { cmd, args } of pipCommands) {
         try {
           let checkArgs;
           if (cmd === 'pip' || cmd === 'pip3') {
@@ -611,21 +611,58 @@ class PackageManagerService extends EventEmitter {
           } else {
             checkArgs = ['--version']; // First call for python/python3
           }
-          const result = await this.runProcess(cmd, checkArgs, 5000);
+          const checkResult = await this.runProcess(cmd, checkArgs, 5000);
 
-          if (result.code === 0) {
+          if (checkResult.code === 0) {
             if (cmd === 'python' || cmd === 'python3') {
               checkArgs = ['-m', 'pip', '--version']; // Second call for python/python3
               const pipResult = await this.runProcess(cmd, checkArgs, 5000);
               if (pipResult.code !== 0) {
-                throw new Error(
-                  `Pip command failed with code ${pipResult.code}: ${pipResult.stderr}`
-                );
+                continue; // Try next command
               }
             }
-            // ... rest of the logic for parsing stdout
-          } else {
-            throw new Error(`Pip command failed with code ${result.code}: ${result.stderr}`);
+
+            // Try JSON format first
+            const result = await this.runProcess(cmd, args, 10000);
+            if (result.code === 0 && result.stdout) {
+              try {
+                const packages = JSON.parse(result.stdout);
+                const updates = packages.map(pkg => ({
+                  packageManager: 'pip',
+                  packageName: pkg.name,
+                  currentVersion: pkg.version,
+                  availableVersion: pkg.latest_version || pkg.latest,
+                }));
+                return updates;
+              } catch (jsonError) {
+                // JSON parsing failed, try text format
+                this.logService.log(`JSON parsing failed for ${cmd}, trying text format: ${jsonError.message}`);
+              }
+            }
+
+            // Try text format as fallback
+            const textArgs = args.slice(0, -1); // Remove --format=json
+            const textResult = await this.runProcess(cmd, textArgs, 10000);
+            if (textResult.code === 0 && textResult.stdout) {
+              const lines = textResult.stdout.split('\n');
+              const updates = [];
+
+              for (let i = 2; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line && !line.includes('Package') && !line.includes('---')) {
+                  const parts = line.split(/\s+/).filter(part => part.length > 0);
+                  if (parts.length >= 3) {
+                    updates.push({
+                      packageManager: 'pip',
+                      packageName: parts[0],
+                      currentVersion: parts[1],
+                      availableVersion: parts[2],
+                    });
+                  }
+                }
+              }
+              return updates;
+            }
           }
         } catch (error) {
           this.logService.log(`Trying next pip command: ${error.message}`);

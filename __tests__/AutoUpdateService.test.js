@@ -137,12 +137,12 @@ describe('AutoUpdateService', () => {
     });
 
     test.skip('should log error and return hasUpdate: false if check fails', async () => {
-      // Skipped: https is required inside the method, making it difficult to mock properly
-      // This edge case is handled by the try-catch in the implementation
+      // Skipped: Difficult to mock https.get synchronous errors properly
+      // The try-catch in the service handles this case
       const updateInfo = await autoUpdateService.checkForUpdates();
       expect(updateInfo).toEqual({ hasUpdate: false });
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to check for updates: General error')
+        expect.stringContaining('Failed to check for updates')
       );
     });
   });
