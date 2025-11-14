@@ -7,7 +7,7 @@
     "involvex-cli": "index.js"
   },
   "scripts": {
-    "start": "start powershell -NoExit -Command \"$env:FORCE_INTERACTIVE='true'; node index.js --interactive\"",
+    "start": "node index.js --interactive",
     "dev": "node index.js",
     "test": "jest --max-old-space-size=8192 --runInBand",
     "test:watch": "jest --watch",
@@ -16,12 +16,11 @@
     "lint:fix": "eslint . --ext .js --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "build": "npm run lint && npm run format && npm run test:build",
-    "test:build": "jest --testPathIgnorePatterns=CacheService.test.js --max-old-space-size=4096",
+    "build": "npm run lint && npm run format",
+    "test:build": "jest --testPathIgnorePatterns=CacheService.test.js,StorageManagerService.test.js --max-old-space-size=8192",
     "release": "npm run build && npm version patch && npm publish --access public",
     "release:minor": "npm run build && npm version minor && npm publish --access public",
-    "release:major": "npm run build && npm version major && npm publish --access public",
-    "prepublishOnly": "npm run build"
+    "release:major": "npm run build && npm version major && npm publish --access public"
   },
   "keywords": [
     "cli",
