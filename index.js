@@ -3594,13 +3594,8 @@ async function main() {
     const pathIndex = args.indexOf('--path');
 
     const port =
-      portIndex !== -1 && portIndex + 1 < args.length
-        ? parseInt(args[portIndex + 1], 10)
-        : 3000;
-    const host =
-      hostIndex !== -1 && hostIndex + 1 < args.length
-        ? args[hostIndex + 1]
-        : '0.0.0.0';
+      portIndex !== -1 && portIndex + 1 < args.length ? parseInt(args[portIndex + 1], 10) : 3000;
+    const host = hostIndex !== -1 && hostIndex + 1 < args.length ? args[hostIndex + 1] : '0.0.0.0';
 
     const webServer = new WebServer(logService, {
       packageManager: packageManagerService,
