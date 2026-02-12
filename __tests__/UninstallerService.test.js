@@ -1,8 +1,8 @@
-const UninstallerService = require('../services/UninstallerService');
-const { spawn } = require('child_process');
+const UninstallerService = require("../services/UninstallerService");
+const { spawn } = require("child_process");
 
 // Mock child_process.spawn
-jest.mock('child_process', () => ({
+jest.mock("child_process", () => ({
   spawn: jest.fn(),
 }));
 
@@ -11,7 +11,7 @@ const mockLogService = {
   log: jest.fn(),
 };
 
-describe('UninstallerService', () => {
+describe("UninstallerService", () => {
   let uninstallerService;
 
   beforeEach(() => {
@@ -19,15 +19,15 @@ describe('UninstallerService', () => {
     uninstallerService = new UninstallerService(mockLogService);
   });
 
-  describe('listInstalledPrograms', () => {
-    test('should list installed programs successfully', async () => {
+  describe("listInstalledPrograms", () => {
+    test("should list installed programs successfully", async () => {
       const mockStdout =
-        '[System] Program1 (v1.0.0) - Publisher1 [Uninstallable]\n[User] Program2 (v2.0.0) - Publisher2 [Uninstallable]';
+        "[System] Program1 (v1.0.0) - Publisher1 [Uninstallable]\n[User] Program2 (v2.0.0) - Publisher2 [Uninstallable]";
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(0), 0);
           }
         }),
@@ -35,7 +35,7 @@ describe('UninstallerService', () => {
 
       let stdoutCallback;
       mockProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           stdoutCallback = callback;
         }
       });
@@ -47,19 +47,27 @@ describe('UninstallerService', () => {
 
       const result = await promise;
 
-      expect(result).toContain('[System] Program1 (v1.0.0) - Publisher1 [Uninstallable]');
-      expect(result).toContain('[User] Program2 (v2.0.0) - Publisher2 [Uninstallable]');
-      expect(mockLogService.log).toHaveBeenCalledWith('Listing installed programs from registry.');
-      expect(mockLogService.log).toHaveBeenCalledWith(expect.stringContaining('Found'));
+      expect(result).toContain(
+        "[System] Program1 (v1.0.0) - Publisher1 [Uninstallable]",
+      );
+      expect(result).toContain(
+        "[User] Program2 (v2.0.0) - Publisher2 [Uninstallable]",
+      );
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        "Listing installed programs from registry.",
+      );
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        expect.stringContaining("Found"),
+      );
     });
 
-    test('should handle errors gracefully', async () => {
+    test("should handle errors gracefully", async () => {
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'error') {
-            setTimeout(() => callback(new Error('Process error')), 0);
+          if (event === "error") {
+            setTimeout(() => callback(new Error("Process error")), 0);
           }
         }),
       };
@@ -68,18 +76,18 @@ describe('UninstallerService', () => {
 
       const result = await uninstallerService.listInstalledPrograms();
 
-      expect(result).toContain('Error: Process error');
+      expect(result).toContain("Error: Process error");
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Exception listing installed programs')
+        expect.stringContaining("Exception listing installed programs"),
       );
     });
 
-    test('should handle non-zero exit code', async () => {
+    test("should handle non-zero exit code", async () => {
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(1), 0);
           }
         }),
@@ -93,14 +101,14 @@ describe('UninstallerService', () => {
     });
   });
 
-  describe('uninstallProgram', () => {
-    test('should uninstall program successfully with MSI uninstaller', async () => {
-      const findStdout = 'msiexec /x {GUID}';
+  describe("uninstallProgram", () => {
+    test("should uninstall program successfully with MSI uninstaller", async () => {
+      const findStdout = "msiexec /x {GUID}";
       const mockFindProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(0), 0);
           }
         }),
@@ -108,7 +116,7 @@ describe('UninstallerService', () => {
 
       let findStdoutCallback;
       mockFindProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           findStdoutCallback = callback;
         }
       });
@@ -117,35 +125,37 @@ describe('UninstallerService', () => {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(0), 0);
           }
         }),
       };
 
-      spawn.mockReturnValueOnce(mockFindProcess).mockReturnValueOnce(mockUninstallProcess);
+      spawn
+        .mockReturnValueOnce(mockFindProcess)
+        .mockReturnValueOnce(mockUninstallProcess);
 
-      const promise = uninstallerService.uninstallProgram('Program1');
+      const promise = uninstallerService.uninstallProgram("Program1");
       findStdoutCallback(Buffer.from(findStdout));
 
       const result = await promise;
 
       expect(result).toBe(true);
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Attempting to uninstall program')
+        expect.stringContaining("Attempting to uninstall program"),
       );
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Successfully initiated uninstall')
+        expect.stringContaining("Successfully initiated uninstall"),
       );
     });
 
-    test('should uninstall program successfully with non-MSI uninstaller', async () => {
-      const findStdout = 'C:\\Program Files\\Program1\\uninstall.exe';
+    test("should uninstall program successfully with non-MSI uninstaller", async () => {
+      const findStdout = "C:\\Program Files\\Program1\\uninstall.exe";
       const mockFindProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(0), 0);
           }
         }),
@@ -153,7 +163,7 @@ describe('UninstallerService', () => {
 
       let findStdoutCallback;
       mockFindProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           findStdoutCallback = callback;
         }
       });
@@ -162,15 +172,17 @@ describe('UninstallerService', () => {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(0), 0);
           }
         }),
       };
 
-      spawn.mockReturnValueOnce(mockFindProcess).mockReturnValueOnce(mockUninstallProcess);
+      spawn
+        .mockReturnValueOnce(mockFindProcess)
+        .mockReturnValueOnce(mockUninstallProcess);
 
-      const promise = uninstallerService.uninstallProgram('Program1');
+      const promise = uninstallerService.uninstallProgram("Program1");
       findStdoutCallback(Buffer.from(findStdout));
 
       const result = await promise;
@@ -178,12 +190,12 @@ describe('UninstallerService', () => {
       expect(result).toBe(true);
     });
 
-    test('should return false if uninstall string not found', async () => {
+    test("should return false if uninstall string not found", async () => {
       const mockFindProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(1), 0);
           }
         }),
@@ -191,21 +203,22 @@ describe('UninstallerService', () => {
 
       spawn.mockReturnValueOnce(mockFindProcess);
 
-      const result = await uninstallerService.uninstallProgram('NonExistentProgram');
+      const result =
+        await uninstallerService.uninstallProgram("NonExistentProgram");
 
       expect(result).toBe(false);
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Could not find uninstall string')
+        expect.stringContaining("Could not find uninstall string"),
       );
     });
 
-    test('should return false if uninstall process fails', async () => {
-      const findStdout = 'C:\\Program Files\\Program1\\uninstall.exe';
+    test("should return false if uninstall process fails", async () => {
+      const findStdout = "C:\\Program Files\\Program1\\uninstall.exe";
       const mockFindProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(0), 0);
           }
         }),
@@ -213,7 +226,7 @@ describe('UninstallerService', () => {
 
       let findStdoutCallback;
       mockFindProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           findStdoutCallback = callback;
         }
       });
@@ -222,56 +235,58 @@ describe('UninstallerService', () => {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(1), 0);
           }
         }),
       };
 
-      spawn.mockReturnValueOnce(mockFindProcess).mockReturnValueOnce(mockUninstallProcess);
+      spawn
+        .mockReturnValueOnce(mockFindProcess)
+        .mockReturnValueOnce(mockUninstallProcess);
 
-      const promise = uninstallerService.uninstallProgram('Program1');
+      const promise = uninstallerService.uninstallProgram("Program1");
       findStdoutCallback(Buffer.from(findStdout));
 
       const result = await promise;
 
       expect(result).toBe(false);
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Uninstall process exited with code')
+        expect.stringContaining("Uninstall process exited with code"),
       );
     });
 
-    test('should handle errors', async () => {
+    test("should handle errors", async () => {
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'error') {
-            setTimeout(() => callback(new Error('Process error')), 0);
+          if (event === "error") {
+            setTimeout(() => callback(new Error("Process error")), 0);
           }
         }),
       };
 
       spawn.mockReturnValue(mockProcess);
 
-      const result = await uninstallerService.uninstallProgram('Program1');
+      const result = await uninstallerService.uninstallProgram("Program1");
 
       expect(result).toBe(false);
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Exception uninstalling program')
+        expect.stringContaining("Exception uninstalling program"),
       );
     });
   });
 
-  describe('runProcess', () => {
-    test('should run process and return result', async () => {
-      const mockStdout = 'output';
-      const mockStderr = 'error output';
+  describe("runProcess", () => {
+    test("should run process and return result", async () => {
+      const mockStdout = "output";
+      const mockStderr = "error output";
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(0), 0);
           }
         }),
@@ -279,19 +294,22 @@ describe('UninstallerService', () => {
 
       let stdoutCallback, stderrCallback;
       mockProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           stdoutCallback = callback;
         }
       });
       mockProcess.stderr.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           stderrCallback = callback;
         }
       });
 
       spawn.mockReturnValue(mockProcess);
 
-      const promise = uninstallerService.runProcess('command', ['arg1', 'arg2']);
+      const promise = uninstallerService.runProcess("command", [
+        "arg1",
+        "arg2",
+      ]);
       stdoutCallback(Buffer.from(mockStdout));
       stderrCallback(Buffer.from(mockStderr));
 
@@ -302,26 +320,28 @@ describe('UninstallerService', () => {
         stdout: mockStdout,
         stderr: mockStderr,
       });
-      expect(spawn).toHaveBeenCalledWith('command', ['arg1', 'arg2'], {
-        stdio: ['pipe', 'pipe', 'pipe'],
+      expect(spawn).toHaveBeenCalledWith("command", ["arg1", "arg2"], {
+        stdio: ["pipe", "pipe", "pipe"],
         shell: true,
       });
     });
 
-    test('should handle process errors', async () => {
+    test("should handle process errors", async () => {
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'error') {
-            setTimeout(() => callback(new Error('Spawn error')), 0);
+          if (event === "error") {
+            setTimeout(() => callback(new Error("Spawn error")), 0);
           }
         }),
       };
 
       spawn.mockReturnValue(mockProcess);
 
-      await expect(uninstallerService.runProcess('command', [])).rejects.toThrow('Spawn error');
+      await expect(
+        uninstallerService.runProcess("command", []),
+      ).rejects.toThrow("Spawn error");
     });
   });
 });

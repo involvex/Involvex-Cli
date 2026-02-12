@@ -6,7 +6,7 @@
     <title>InvolveX CLI - Windows System Administration Toolkit</title>
     <link rel="icon" type="image/png" href="favicon.png" />
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+      @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap");
 
       * {
         margin: 0;
@@ -15,7 +15,7 @@
       }
 
       body {
-        font-family: 'JetBrains Mono', 'Courier New', monospace;
+        font-family: "JetBrains Mono", "Courier New", monospace;
         background: #000000;
         color: #00ff00;
         min-height: 100vh;
@@ -138,7 +138,7 @@
 
       /* ASCII Logo */
       .ascii-logo {
-        font-family: 'JetBrains Mono', monospace;
+        font-family: "JetBrains Mono", monospace;
         font-size: 10px;
         line-height: 1.2;
         color: #00ff00;
@@ -197,7 +197,7 @@
       }
 
       .prompt::before {
-        content: '> ';
+        content: "> ";
         color: #00ff00;
         font-weight: bold;
       }
@@ -345,7 +345,7 @@
         border: 1px solid #00ff00;
         padding: 15px 20px;
         border-radius: 4px;
-        font-family: 'JetBrains Mono', monospace;
+        font-family: "JetBrains Mono", monospace;
         font-size: 16px;
         color: #00ff00;
         margin: 20px 0;
@@ -355,18 +355,23 @@
       }
 
       .install-command::before {
-        content: '$ ';
+        content: "$ ";
         color: #00ff00;
       }
 
       .install-command::after {
-        content: '';
+        content: "";
         position: absolute;
         top: 0;
         left: -100%;
         width: 100%;
         height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(0, 255, 0, 0.2), transparent);
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(0, 255, 0, 0.2),
+          transparent
+        );
         animation: shimmer 3s infinite;
       }
 
@@ -388,7 +393,7 @@
         color: #00ff00;
         text-decoration: none;
         border-radius: 4px;
-        font-family: 'JetBrains Mono', monospace;
+        font-family: "JetBrains Mono", monospace;
         font-size: 14px;
         transition: all 0.3s ease;
         margin: 10px 10px 10px 0;
@@ -397,7 +402,7 @@
       }
 
       .btn::before {
-        content: '';
+        content: "";
         position: absolute;
         top: 0;
         left: -100%;
@@ -578,14 +583,19 @@
 
           <!-- Commands -->
           <div class="command">
-            <span style="color: #00ff88">$</span> npm install -g @involvex/involvex-cli
+            <span style="color: #00ff88">$</span> npm install -g
+            @involvex/involvex-cli
           </div>
           <div class="output success">✓ Package installed successfully</div>
 
-          <div class="command"><span style="color: #00ff88">$</span> involvex-cli --version</div>
+          <div class="command">
+            <span style="color: #00ff88">$</span> involvex-cli --version
+          </div>
           <div class="output">InvolveX CLI v1.0.1</div>
 
-          <div class="command"><span style="color: #00ff88">$</span> involvex-cli --help</div>
+          <div class="command">
+            <span style="color: #00ff88">$</span> involvex-cli --help
+          </div>
           <div class="output">Windows System Administration Toolkit</div>
 
           <!-- Install Section -->
@@ -593,11 +603,18 @@
             <div class="prompt">
               <span style="color: #00ff00; font-weight: bold">[INSTALL]</span>
             </div>
-            <div class="output" style="margin: 15px 0">Install InvolveX CLI globally via npm:</div>
-            <div class="install-command" id="installCmd">npm install -g @involvex/involvex-cli</div>
+            <div class="output" style="margin: 15px 0">
+              Install InvolveX CLI globally via npm:
+            </div>
+            <div class="install-command" id="installCmd">
+              npm install -g @involvex/involvex-cli
+            </div>
             <div style="margin-top: 20px">
               <a href="#features" class="btn">Explore Features</a>
-              <a href="https://github.com/involvex/Involvex-Cli" class="btn" target="_blank"
+              <a
+                href="https://github.com/involvex/Involvex-Cli"
+                class="btn"
+                target="_blank"
                 >View on GitHub</a
               >
               <a href="#discord-rpc" class="btn">Discord RPC Plugin</a>
@@ -614,56 +631,79 @@
               <div class="feature-card">
                 <h3>📦 Package Management</h3>
                 <p>
-                  Update winget, npm, scoop, and Chocolatey packages. Check for available updates
-                  across all package managers.
+                  Update winget, npm, scoop, and Chocolatey packages. Check for
+                  available updates across all package managers.
                 </p>
               </div>
               <div class="feature-card">
                 <h3>🖥️ System Monitoring</h3>
                 <p>
-                  Monitor CPU, memory, GPU, and drive usage. Get real-time system performance
-                  metrics.
+                  Monitor CPU, memory, GPU, and drive usage. Get real-time
+                  system performance metrics.
                 </p>
               </div>
               <div class="feature-card">
                 <h3>🗑️ Cache Management</h3>
                 <p>
-                  Clear system caches and temporary files. Optimize memory and free up disk space.
+                  Clear system caches and temporary files. Optimize memory and
+                  free up disk space.
                 </p>
               </div>
               <div class="feature-card">
                 <h3>🚀 Startup Programs</h3>
-                <p>List and disable startup programs. Manage what runs when Windows starts.</p>
+                <p>
+                  List and disable startup programs. Manage what runs when
+                  Windows starts.
+                </p>
               </div>
               <div class="feature-card">
                 <h3>🔧 Program Management</h3>
-                <p>List and uninstall installed programs. Clean up your system efficiently.</p>
+                <p>
+                  List and uninstall installed programs. Clean up your system
+                  efficiently.
+                </p>
               </div>
               <div class="feature-card">
                 <h3>🌐 DNS Configuration</h3>
-                <p>Set and reset DNS servers. Configure network settings with ease.</p>
+                <p>
+                  Set and reset DNS servers. Configure network settings with
+                  ease.
+                </p>
               </div>
               <div class="feature-card">
                 <h3>📡 Network Tools</h3>
-                <p>Run ping tests and speed tests. Diagnose network connectivity issues.</p>
+                <p>
+                  Run ping tests and speed tests. Diagnose network connectivity
+                  issues.
+                </p>
               </div>
               <div class="feature-card">
                 <h3>💾 Driver Management</h3>
-                <p>Check and update drivers. Keep your hardware drivers up to date.</p>
+                <p>
+                  Check and update drivers. Keep your hardware drivers up to
+                  date.
+                </p>
               </div>
               <div class="feature-card">
                 <h3>🔄 System Restore</h3>
-                <p>Create and manage restore points. Safeguard your system configuration.</p>
+                <p>
+                  Create and manage restore points. Safeguard your system
+                  configuration.
+                </p>
               </div>
               <div class="feature-card">
                 <h3>🔌 Plugin System</h3>
-                <p>Extensible plugin architecture. Extend functionality with custom plugins.</p>
+                <p>
+                  Extensible plugin architecture. Extend functionality with
+                  custom plugins.
+                </p>
               </div>
               <div class="feature-card">
                 <h3>🟢 Discord Rich Presence</h3>
                 <p>
-                  Broadcast your terminal adventures with the built-in Discord RPC plugin featuring
-                  animated status updates and hacker-themed artwork.
+                  Broadcast your terminal adventures with the built-in Discord
+                  RPC plugin featuring animated status updates and hacker-themed
+                  artwork.
                 </p>
               </div>
             </div>
@@ -672,24 +712,38 @@
           <!-- Package Managers -->
           <div style="margin-top: 50px">
             <div class="prompt">
-              <span style="color: #00ff00; font-weight: bold">[PACKAGE MANAGERS]</span>
+              <span style="color: #00ff00; font-weight: bold"
+                >[PACKAGE MANAGERS]</span
+              >
             </div>
             <div class="features-grid" style="margin-top: 20px">
               <div class="feature-card">
                 <h3>🪟 Winget</h3>
-                <p>Microsoft's official Windows Package Manager for modern Windows applications</p>
+                <p>
+                  Microsoft's official Windows Package Manager for modern
+                  Windows applications
+                </p>
               </div>
               <div class="feature-card">
                 <h3>📦 NPM</h3>
-                <p>Node Package Manager for JavaScript development tools and libraries</p>
+                <p>
+                  Node Package Manager for JavaScript development tools and
+                  libraries
+                </p>
               </div>
               <div class="feature-card">
                 <h3>🍴 Scoop</h3>
-                <p>A command-line installer for Windows that focuses on developer tools</p>
+                <p>
+                  A command-line installer for Windows that focuses on developer
+                  tools
+                </p>
               </div>
               <div class="feature-card">
                 <h3>🍫 Chocolatey</h3>
-                <p>The package manager for Windows software installation and updates</p>
+                <p>
+                  The package manager for Windows software installation and
+                  updates
+                </p>
               </div>
             </div>
           </div>
@@ -697,20 +751,36 @@
           <!-- Usage Examples -->
           <div style="margin-top: 50px">
             <div class="prompt">
-              <span style="color: #00ff00; font-weight: bold">[USAGE EXAMPLES]</span>
+              <span style="color: #00ff00; font-weight: bold"
+                >[USAGE EXAMPLES]</span
+              >
             </div>
             <div style="margin-top: 20px; padding-left: 20px">
-              <div class="command"><span style="color: #00ff88">$</span> involvex-cli</div>
-              <div class="output" style="color: #888"># Start interactive mode</div>
+              <div class="command">
+                <span style="color: #00ff88">$</span> involvex-cli
+              </div>
+              <div class="output" style="color: #888">
+                # Start interactive mode
+              </div>
 
-              <div class="command"><span style="color: #00ff88">$</span> involvex-cli --help</div>
-              <div class="output" style="color: #888"># Show help information</div>
+              <div class="command">
+                <span style="color: #00ff88">$</span> involvex-cli --help
+              </div>
+              <div class="output" style="color: #888">
+                # Show help information
+              </div>
 
-              <div class="command"><span style="color: #00ff88">$</span> involvex-cli --update</div>
+              <div class="command">
+                <span style="color: #00ff88">$</span> involvex-cli --update
+              </div>
               <div class="output" style="color: #888"># Check for updates</div>
 
-              <div class="command"><span style="color: #00ff88">$</span> involvex-cli --cache</div>
-              <div class="output" style="color: #888"># Clear system caches</div>
+              <div class="command">
+                <span style="color: #00ff88">$</span> involvex-cli --cache
+              </div>
+              <div class="output" style="color: #888">
+                # Clear system caches
+              </div>
 
               <div class="command">
                 <span style="color: #00ff88">$</span> involvex-cli --network
@@ -722,29 +792,42 @@
           <!-- Discord RPC Plugin Section -->
           <div id="discord-rpc" style="margin-top: 60px">
             <div class="prompt">
-              <span style="color: #00ff00; font-weight: bold">[DISCORD RPC PLUGIN]</span>
+              <span style="color: #00ff00; font-weight: bold"
+                >[DISCORD RPC PLUGIN]</span
+              >
             </div>
             <div class="card" style="margin-top: 20px">
-              <h2 style="color: #00ff00; margin-bottom: 10px">Rich Presence for Terminal Ninjas</h2>
+              <h2 style="color: #00ff00; margin-bottom: 10px">
+                Rich Presence for Terminal Ninjas
+              </h2>
               <p style="color: #00ff88; line-height: 1.6">
-                Toggle the Discord RPC plugin directly from the CLI settings menu to broadcast your
-                command-line missions. The integration ships with randomly generated meme-friendly
-                descriptions such as <code>Generated 256 cups of coffee ☕</code> or
-                <code>Updated 42 packages 📦</code>, keeping your status playful while showcasing
-                real activity.
+                Toggle the Discord RPC plugin directly from the CLI settings
+                menu to broadcast your command-line missions. The integration
+                ships with randomly generated meme-friendly descriptions such as
+                <code>Generated 256 cups of coffee ☕</code> or
+                <code>Updated 42 packages 📦</code>, keeping your status playful
+                while showcasing real activity.
               </p>
               <p style="color: #00ff88; line-height: 1.6; margin-top: 12px">
                 Default Discord Application ID:
                 <code>1438575785228242994</code> · Public Key:
-                <code>fe1dca8f9e7f55080493178e503508b0fd4380c4831186ec5d536c61d942ad6d</code>
+                <code
+                  >fe1dca8f9e7f55080493178e503508b0fd4380c4831186ec5d536c61d942ad6d</code
+                >
               </p>
               <div class="asset-preview">
                 <img
                   src="assets/discord-logo.png"
                   alt="InvolveX Discord Application Logo 1024x1024"
                 />
-                <img src="assets/discord-banner.png" alt="InvolveX Discord Banner 680x240" />
-                <img src="assets/discord-cover.png" alt="InvolveX Discord Cover 1024x576" />
+                <img
+                  src="assets/discord-banner.png"
+                  alt="InvolveX Discord Banner 680x240"
+                />
+                <img
+                  src="assets/discord-cover.png"
+                  alt="InvolveX Discord Cover 1024x576"
+                />
               </div>
               <div style="margin-top: 20px">
                 <a
@@ -764,51 +847,64 @@
               <span style="color: #00ff00; font-weight: bold">[POLICIES]</span>
             </div>
             <section class="card" id="policies" style="margin-top: 20px">
-              <h2 style="color: #00ff00; margin-bottom: 10px">Compliance &amp; Transparency</h2>
+              <h2 style="color: #00ff00; margin-bottom: 10px">
+                Compliance &amp; Transparency
+              </h2>
               <p style="color: #00ff88; line-height: 1.6">
-                InvolveX CLI is designed for engineers who value clarity. Review the official Terms
-                of Service and Privacy Policy to understand how the toolkit is licensed, how your
-                data is handled, and how to get in touch.
+                InvolveX CLI is designed for engineers who value clarity. Review
+                the official Terms of Service and Privacy Policy to understand
+                how the toolkit is licensed, how your data is handled, and how
+                to get in touch.
               </p>
               <div class="policy-grid" style="margin-top: 24px">
                 <div class="policy-card" id="terms-of-service">
                   <h3>Terms of Service</h3>
                   <p>
-                    By installing or using InvolveX CLI you agree to the MIT License and to use the
-                    toolkit responsibly. Administrative operations may require elevated privileges,
-                    and you are solely responsible for the commands you execute. Do not use the
-                    toolkit for unlawful activity or in environments where automation is restricted.
+                    By installing or using InvolveX CLI you agree to the MIT
+                    License and to use the toolkit responsibly. Administrative
+                    operations may require elevated privileges, and you are
+                    solely responsible for the commands you execute. Do not use
+                    the toolkit for unlawful activity or in environments where
+                    automation is restricted.
                   </p>
                   <p>
-                    Contributions are welcome via GitHub pull requests. By contributing you agree
-                    that your code will be released under the MIT License and that you have the
-                    rights to share the code.
+                    Contributions are welcome via GitHub pull requests. By
+                    contributing you agree that your code will be released under
+                    the MIT License and that you have the rights to share the
+                    code.
                   </p>
                   <p>
-                    Support is provided on a best-effort basis via the GitHub issue tracker.
-                    Critical incidents should be triaged locally before opening an issue.
+                    Support is provided on a best-effort basis via the GitHub
+                    issue tracker. Critical incidents should be triaged locally
+                    before opening an issue.
                   </p>
                 </div>
                 <div class="policy-card" id="privacy-policy">
                   <h3>Privacy Policy</h3>
                   <p>
-                    InvolveX CLI does not collect personal data, analytics, or telemetry. All
-                    configuration is stored locally at <code>%USERPROFILE%\.involvex-cli</code> and
-                    never transmitted off-device by default.
+                    InvolveX CLI does not collect personal data, analytics, or
+                    telemetry. All configuration is stored locally at
+                    <code>%USERPROFILE%\.involvex-cli</code> and never
+                    transmitted off-device by default.
                   </p>
                   <p>
-                    Optional integrations (such as Discord RPC) communicate directly with the
-                    respective third-party APIs using credentials you provide. Disabling those
-                    integrations stops all outbound communication.
+                    Optional integrations (such as Discord RPC) communicate
+                    directly with the respective third-party APIs using
+                    credentials you provide. Disabling those integrations stops
+                    all outbound communication.
                   </p>
                   <p>
-                    Log files generated by the CLI remain on your machine inside the
-                    <code>logs/</code> directory. You may delete them at any time.
+                    Log files generated by the CLI remain on your machine inside
+                    the
+                    <code>logs/</code> directory. You may delete them at any
+                    time.
                   </p>
                 </div>
               </div>
               <div style="margin-top: 20px">
-                <a href="#terms-of-service" class="btn">View Terms of Service</a>
+                <a href="#terms-of-service" class="btn"
+                  >View Terms of Service</a
+                >
                 <a href="#privacy-policy" class="btn">View Privacy Policy</a>
               </div>
             </section>
@@ -824,7 +920,9 @@
                 >GitHub Repository</a
               >
               •
-              <a href="https://www.npmjs.com/package/@involvex/involvex-cli" target="_blank"
+              <a
+                href="https://www.npmjs.com/package/@involvex/involvex-cli"
+                target="_blank"
                 >NPM Package</a
               >
               •
@@ -856,16 +954,20 @@
 
               Windows System Administration Toolkit`;
 
-      document.getElementById('asciiLogo').textContent = asciiLogo;
+      document.getElementById("asciiLogo").textContent = asciiLogo;
 
       // Typing animation for welcome text
-      const welcomeText = 'Welcome to InvolveX CLI - Windows System Administration Toolkit';
+      const welcomeText =
+        "Welcome to InvolveX CLI - Windows System Administration Toolkit";
       let welcomeIndex = 0;
-      const welcomeElement = document.getElementById('welcomeText');
+      const welcomeElement = document.getElementById("welcomeText");
 
       function typeWelcome() {
         if (welcomeIndex < welcomeText.length) {
-          welcomeElement.textContent = welcomeText.substring(0, welcomeIndex + 1);
+          welcomeElement.textContent = welcomeText.substring(
+            0,
+            welcomeIndex + 1,
+          );
           welcomeIndex++;
           setTimeout(typeWelcome, 50);
         }
@@ -875,46 +977,48 @@
       setTimeout(typeWelcome, 1000);
 
       // Matrix rain effect
-      const matrixBg = document.getElementById('matrixBg');
+      const matrixBg = document.getElementById("matrixBg");
       const chars =
-        '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+        "01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン";
       const numChars = 50;
 
       for (let i = 0; i < numChars; i++) {
-        const char = document.createElement('div');
-        char.className = 'matrix-char';
+        const char = document.createElement("div");
+        char.className = "matrix-char";
         char.textContent = chars[Math.floor(Math.random() * chars.length)];
-        char.style.left = Math.random() * 100 + '%';
-        char.style.animationDuration = Math.random() * 3 + 2 + 's';
-        char.style.animationDelay = Math.random() * 2 + 's';
-        char.style.fontSize = Math.random() * 10 + 10 + 'px';
+        char.style.left = Math.random() * 100 + "%";
+        char.style.animationDuration = Math.random() * 3 + 2 + "s";
+        char.style.animationDelay = Math.random() * 2 + "s";
+        char.style.fontSize = Math.random() * 10 + 10 + "px";
         matrixBg.appendChild(char);
       }
 
       // Add click effect to install command
-      const installCmd = document.getElementById('installCmd');
-      installCmd.style.cursor = 'pointer';
-      installCmd.addEventListener('click', () => {
-        navigator.clipboard.writeText('npm install -g @involvex/involvex-cli').then(() => {
-          const originalText = installCmd.textContent;
-          installCmd.textContent = '$ ✓ Copied to clipboard!';
-          installCmd.style.color = '#00ff00';
-          setTimeout(() => {
-            installCmd.textContent = originalText;
-            installCmd.style.color = '#00ff00';
-          }, 2000);
-        });
+      const installCmd = document.getElementById("installCmd");
+      installCmd.style.cursor = "pointer";
+      installCmd.addEventListener("click", () => {
+        navigator.clipboard
+          .writeText("npm install -g @involvex/involvex-cli")
+          .then(() => {
+            const originalText = installCmd.textContent;
+            installCmd.textContent = "$ ✓ Copied to clipboard!";
+            installCmd.style.color = "#00ff00";
+            setTimeout(() => {
+              installCmd.textContent = originalText;
+              installCmd.style.color = "#00ff00";
+            }, 2000);
+          });
       });
 
       // Smooth scroll for anchor links
       document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
+        anchor.addEventListener("click", function (e) {
           e.preventDefault();
-          const target = document.querySelector(this.getAttribute('href'));
+          const target = document.querySelector(this.getAttribute("href"));
           if (target) {
             target.scrollIntoView({
-              behavior: 'smooth',
-              block: 'start',
+              behavior: "smooth",
+              block: "start",
             });
           }
         });
@@ -923,18 +1027,18 @@
       // Add terminal-like typing effect to commands on scroll
       const observerOptions = {
         threshold: 0.1,
-        rootMargin: '0px',
+        rootMargin: "0px",
       };
 
       const observer = new IntersectionObserver(entries => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
-            entry.target.style.animationPlayState = 'running';
+            entry.target.style.animationPlayState = "running";
           }
         });
       }, observerOptions);
 
-      document.querySelectorAll('.command').forEach(cmd => {
+      document.querySelectorAll(".command").forEach(cmd => {
         observer.observe(cmd);
       });
     </script>

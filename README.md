@@ -9,9 +9,9 @@
               Windows System Administration Toolkit
 ```
 
-# InvolveX CLI - JavaScript Edition
+# InvolveX CLI - Typescript Edition
 
-A comprehensive Windows system administration toolkit built with Node.js, providing an easy-to-use terminal user interface for common system maintenance tasks.
+A comprehensive Windows system administration toolkit built with Node.js and bun, providing an easy-to-use terminal user interface for common system maintenance tasks.
 
 ## Features
 
@@ -60,7 +60,7 @@ A comprehensive Windows system administration toolkit built with Node.js, provid
 ### Install from NPM (when published)
 
 ```bash
-npm install -g involvex-cli
+npm install -g @involvex/involvex-cli
 ```
 
 ### Manual Installation
@@ -70,7 +70,7 @@ npm install -g involvex-cli
 3. Install dependencies:
 
 ```bash
-npm install
+bun install
 ```
 
 4. Make the script executable (optional):

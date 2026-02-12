@@ -8,7 +8,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 
   // Clear any remaining async operations
-  if (typeof global.gc === 'function') {
+  if (typeof global.gc === "function") {
     global.gc();
   }
 });

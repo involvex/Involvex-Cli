@@ -1,23 +1,24 @@
 // Discord RPC - using discord-rpc package
 let discordRPC = null;
 try {
-  discordRPC = require('discord-rpc');
+  discordRPC = require("discord-rpc");
 } catch {
   // Package not installed, will handle gracefully
 }
 
-const blessed = require('blessed'); // Add this line
+const blessed = require("blessed"); // Add this line
 
 class DiscordRPCPlugin {
   constructor() {
-    this.name = 'DiscordRPC';
-    this.description = 'Discord Rich Presence integration with funny status messages';
-    this.version = '1.0.0';
-    this.author = 'InvolveX';
+    this.name = "DiscordRPC";
+    this.description =
+      "Discord Rich Presence integration with funny status messages";
+    this.version = "1.0.0";
+    this.author = "InvolveX";
     this.client = null;
     this.isConnected = false;
     this.updateInterval = null;
-    this.clientId = '1438575785228242994'; // Default InvolveX CLI Discord application ID
+    this.clientId = "1438575785228242994"; // Default InvolveX CLI Discord application ID
   }
 
   async initializeAsync() {
@@ -37,24 +38,26 @@ class DiscordRPCPlugin {
     }
 
     if (!discordRPC) {
-      console.error('Discord RPC package not installed. Run: npm install discord-rpc');
+      console.error(
+        "Discord RPC package not installed. Run: npm install discord-rpc",
+      );
       return false;
     }
 
     try {
       this.clientId = clientId || this.clientId;
       const RPC = discordRPC.Client;
-      this.client = new RPC({ transport: 'ipc' });
+      this.client = new RPC({ transport: "ipc" });
 
-      this.client.on('ready', () => {
+      this.client.on("ready", () => {
         this.isConnected = true;
-        console.log('Discord RPC connected!');
+        console.log("Discord RPC connected!");
       });
 
       await this.client.login({ clientId: this.clientId });
       return true;
     } catch (error) {
-      console.error('Discord RPC connection failed:', error.message);
+      console.error("Discord RPC connection failed:", error.message);
       this.isConnected = false;
       return false;
     }
@@ -65,9 +68,9 @@ class DiscordRPCPlugin {
       try {
         await this.client.destroy();
         this.isConnected = false;
-        console.log('Discord RPC disconnected');
+        console.log("Discord RPC disconnected");
       } catch (error) {
-        console.error('Error disconnecting Discord RPC:', error.message);
+        console.error("Error disconnecting Discord RPC:", error.message);
       }
     }
   }
@@ -117,16 +120,16 @@ class DiscordRPCPlugin {
     try {
       const description = this.generateRandomDescription();
       await this.client.setActivity({
-        details: 'Using InvolveX CLI',
+        details: "Using InvolveX CLI",
         state: description,
-        largeImageKey: 'involvex_logo',
-        largeImageText: 'InvolveX CLI - Windows System Administration Toolkit',
-        smallImageKey: 'terminal',
-        smallImageText: 'Terminal Mode',
+        largeImageKey: "involvex_logo",
+        largeImageText: "InvolveX CLI - Windows System Administration Toolkit",
+        smallImageKey: "terminal",
+        smallImageText: "Terminal Mode",
         startTimestamp: Date.now(),
       });
     } catch (error) {
-      console.error('Error updating Discord presence:', error.message);
+      console.error("Error updating Discord presence:", error.message);
     }
   }
 
@@ -160,21 +163,21 @@ class DiscordRPCPlugin {
     // Execution handled through settings; nothing to render directly
     // Instead, show a message to the user
     const messageDialog = blessed.box({
-      top: 'center',
-      left: 'center',
-      width: '50%',
-      height: '20%',
+      top: "center",
+      left: "center",
+      width: "50%",
+      height: "20%",
       border: {
-        type: 'line',
+        type: "line",
       },
-      label: ' {green-fg}Discord RPC{/green-fg} ',
+      label: " {green-fg}Discord RPC{/green-fg} ",
       content:
-        '\nDiscord Rich Presence is managed via the Settings menu.\n\nPress any key to continue...',
+        "\nDiscord Rich Presence is managed via the Settings menu.\n\nPress any key to continue...",
       style: {
-        bg: 'black',
-        fg: 'green',
+        bg: "black",
+        fg: "green",
         border: {
-          fg: 'green',
+          fg: "green",
         },
       },
       keys: true,
@@ -184,7 +187,7 @@ class DiscordRPCPlugin {
     screen.render();
 
     return new Promise(resolve => {
-      messageDialog.key(['enter', 'escape', 'q', 'space'], () => {
+      messageDialog.key(["enter", "escape", "q", "space"], () => {
         messageDialog.destroy();
         screen.render();
         resolve(true);

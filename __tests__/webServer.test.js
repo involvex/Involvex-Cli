@@ -1,8 +1,8 @@
-const WebServer = require('../server/webServer');
-const express = require('express');
+const WebServer = require("../server/webServer");
+const express = require("express");
 
 // Mock express
-jest.mock('express', () => {
+jest.mock("express", () => {
   const mockApp = {
     use: jest.fn(),
     get: jest.fn(),
@@ -51,7 +51,7 @@ const mockServices = {
   },
 };
 
-describe('WebServer', () => {
+describe("WebServer", () => {
   let webServer;
   let mockApp;
 
@@ -61,8 +61,8 @@ describe('WebServer', () => {
     webServer = new WebServer(mockLogService, mockServices);
   });
 
-  describe('constructor', () => {
-    test('should create express app and setup routes', () => {
+  describe("constructor", () => {
+    test("should create express app and setup routes", () => {
       expect(express).toHaveBeenCalled();
       expect(mockApp.use).toHaveBeenCalled();
       expect(mockApp.get).toHaveBeenCalled();
@@ -70,32 +70,32 @@ describe('WebServer', () => {
     });
   });
 
-  describe('setupRoutes', () => {
-    test('should setup middleware', () => {
+  describe("setupRoutes", () => {
+    test("should setup middleware", () => {
       expect(mockApp.use).toHaveBeenCalledWith(expect.any(Function)); // express.json()
       // Check that express.static was called with 'public'
-      expect(express.static).toHaveBeenCalledWith('public');
+      expect(express.static).toHaveBeenCalledWith("public");
     });
 
-    test('should setup GET / route', () => {
+    test("should setup GET / route", () => {
       const getCalls = mockApp.get.mock.calls;
-      const rootCall = getCalls.find(call => call[0] === '/');
+      const rootCall = getCalls.find(call => call[0] === "/");
       expect(rootCall).toBeDefined();
-      expect(typeof rootCall[1]).toBe('function');
+      expect(typeof rootCall[1]).toBe("function");
     });
 
-    test('should setup GET /api/menu route', () => {
+    test("should setup GET /api/menu route", () => {
       const getCalls = mockApp.get.mock.calls;
-      const menuCall = getCalls.find(call => call[0] === '/api/menu');
+      const menuCall = getCalls.find(call => call[0] === "/api/menu");
       expect(menuCall).toBeDefined();
-      expect(typeof menuCall[1]).toBe('function');
+      expect(typeof menuCall[1]).toBe("function");
     });
   });
 
-  describe('GET /api/menu', () => {
-    test('should return menu items', () => {
+  describe("GET /api/menu", () => {
+    test("should return menu items", () => {
       const getCalls = mockApp.get.mock.calls;
-      const menuCall = getCalls.find(call => call[0] === '/api/menu');
+      const menuCall = getCalls.find(call => call[0] === "/api/menu");
       const handler = menuCall[1];
       const mockRes = { json: jest.fn() };
 
@@ -103,60 +103,70 @@ describe('WebServer', () => {
 
       expect(mockRes.json).toHaveBeenCalledWith({
         items: expect.arrayContaining([
-          'Update',
-          'Cache',
-          'Startup',
-          'Uninstall',
-          'DNS',
-          'Network',
-          'Driver',
-          'System Restore',
-          'Plugins',
-          'Settings',
+          "Update",
+          "Cache",
+          "Startup",
+          "Uninstall",
+          "DNS",
+          "Network",
+          "Driver",
+          "System Restore",
+          "Plugins",
+          "Settings",
         ]),
       });
     });
   });
 
-  describe('GET /api/updates', () => {
-    test('should return updates successfully', async () => {
-      const mockUpdates = [{ name: 'package1', version: '1.0.0' }];
-      mockServices.packageManager.getAvailableUpdatesAsync.mockResolvedValue(mockUpdates);
-
-      const getCalls = mockApp.get.mock.calls;
-      const updatesCall = getCalls.find(call => call[0] === '/api/updates');
-      const handler = updatesCall[1];
-      const mockRes = { json: jest.fn() };
-
-      await handler({}, mockRes);
-
-      expect(mockRes.json).toHaveBeenCalledWith({ success: true, updates: mockUpdates });
-    });
-
-    test('should handle errors', async () => {
-      mockServices.packageManager.getAvailableUpdatesAsync.mockRejectedValue(
-        new Error('Update error')
+  describe("GET /api/updates", () => {
+    test("should return updates successfully", async () => {
+      const mockUpdates = [{ name: "package1", version: "1.0.0" }];
+      mockServices.packageManager.getAvailableUpdatesAsync.mockResolvedValue(
+        mockUpdates,
       );
 
       const getCalls = mockApp.get.mock.calls;
-      const updatesCall = getCalls.find(call => call[0] === '/api/updates');
+      const updatesCall = getCalls.find(call => call[0] === "/api/updates");
       const handler = updatesCall[1];
       const mockRes = { json: jest.fn() };
 
       await handler({}, mockRes);
 
-      expect(mockRes.json).toHaveBeenCalledWith({ success: false, error: 'Update error' });
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        updates: mockUpdates,
+      });
+    });
+
+    test("should handle errors", async () => {
+      mockServices.packageManager.getAvailableUpdatesAsync.mockRejectedValue(
+        new Error("Update error"),
+      );
+
+      const getCalls = mockApp.get.mock.calls;
+      const updatesCall = getCalls.find(call => call[0] === "/api/updates");
+      const handler = updatesCall[1];
+      const mockRes = { json: jest.fn() };
+
+      await handler({}, mockRes);
+
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        error: "Update error",
+      });
     });
   });
 
-  describe('POST /api/update/:manager', () => {
-    test('should update winget', async () => {
+  describe("POST /api/update/:manager", () => {
+    test("should update winget", async () => {
       mockServices.packageManager.updateWinget.mockResolvedValue(true);
 
       const postCalls = mockApp.post.mock.calls;
-      const updateCall = postCalls.find(call => call[0] === '/api/update/:manager');
+      const updateCall = postCalls.find(
+        call => call[0] === "/api/update/:manager",
+      );
       const handler = updateCall[1];
-      const mockReq = { params: { manager: 'winget' } };
+      const mockReq = { params: { manager: "winget" } };
       const mockRes = { json: jest.fn() };
 
       await handler(mockReq, mockRes);
@@ -165,13 +175,15 @@ describe('WebServer', () => {
       expect(mockRes.json).toHaveBeenCalledWith({ success: true });
     });
 
-    test('should update npm', async () => {
+    test("should update npm", async () => {
       mockServices.packageManager.updateNpm.mockResolvedValue(true);
 
       const postCalls = mockApp.post.mock.calls;
-      const updateCall = postCalls.find(call => call[0] === '/api/update/:manager');
+      const updateCall = postCalls.find(
+        call => call[0] === "/api/update/:manager",
+      );
       const handler = updateCall[1];
-      const mockReq = { params: { manager: 'npm' } };
+      const mockReq = { params: { manager: "npm" } };
       const mockRes = { json: jest.fn() };
 
       await handler(mockReq, mockRes);
@@ -180,27 +192,34 @@ describe('WebServer', () => {
       expect(mockRes.json).toHaveBeenCalledWith({ success: true });
     });
 
-    test('should handle errors', async () => {
-      mockServices.packageManager.updateWinget.mockRejectedValue(new Error('Update error'));
+    test("should handle errors", async () => {
+      mockServices.packageManager.updateWinget.mockRejectedValue(
+        new Error("Update error"),
+      );
 
       const postCalls = mockApp.post.mock.calls;
-      const updateCall = postCalls.find(call => call[0] === '/api/update/:manager');
+      const updateCall = postCalls.find(
+        call => call[0] === "/api/update/:manager",
+      );
       const handler = updateCall[1];
-      const mockReq = { params: { manager: 'winget' } };
+      const mockReq = { params: { manager: "winget" } };
       const mockRes = { json: jest.fn() };
 
       await handler(mockReq, mockRes);
 
-      expect(mockRes.json).toHaveBeenCalledWith({ success: false, error: 'Update error' });
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        error: "Update error",
+      });
     });
   });
 
-  describe('POST /api/cache/clear', () => {
-    test('should clear cache successfully', async () => {
+  describe("POST /api/cache/clear", () => {
+    test("should clear cache successfully", async () => {
       mockServices.cache.clearSystemCache.mockResolvedValue(true);
 
       const postCalls = mockApp.post.mock.calls;
-      const cacheCall = postCalls.find(call => call[0] === '/api/cache/clear');
+      const cacheCall = postCalls.find(call => call[0] === "/api/cache/clear");
       const handler = cacheCall[1];
       const mockRes = { json: jest.fn() };
 
@@ -210,26 +229,33 @@ describe('WebServer', () => {
       expect(mockRes.json).toHaveBeenCalledWith({ success: true });
     });
 
-    test('should handle errors', async () => {
-      mockServices.cache.clearSystemCache.mockRejectedValue(new Error('Cache error'));
+    test("should handle errors", async () => {
+      mockServices.cache.clearSystemCache.mockRejectedValue(
+        new Error("Cache error"),
+      );
 
       const postCalls = mockApp.post.mock.calls;
-      const cacheCall = postCalls.find(call => call[0] === '/api/cache/clear');
+      const cacheCall = postCalls.find(call => call[0] === "/api/cache/clear");
       const handler = cacheCall[1];
       const mockRes = { json: jest.fn() };
 
       await handler({}, mockRes);
 
-      expect(mockRes.json).toHaveBeenCalledWith({ success: false, error: 'Cache error' });
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        error: "Cache error",
+      });
     });
   });
 
-  describe('POST /api/cache/memory', () => {
-    test('should clear memory successfully', async () => {
+  describe("POST /api/cache/memory", () => {
+    test("should clear memory successfully", async () => {
       mockServices.cache.clearMemory.mockResolvedValue(true);
 
       const postCalls = mockApp.post.mock.calls;
-      const memoryCall = postCalls.find(call => call[0] === '/api/cache/memory');
+      const memoryCall = postCalls.find(
+        call => call[0] === "/api/cache/memory",
+      );
       const handler = memoryCall[1];
       const mockRes = { json: jest.fn() };
 
@@ -240,96 +266,110 @@ describe('WebServer', () => {
     });
   });
 
-  describe('GET /api/startup', () => {
-    test('should return startup programs', async () => {
-      const mockPrograms = ['Program1', 'Program2'];
+  describe("GET /api/startup", () => {
+    test("should return startup programs", async () => {
+      const mockPrograms = ["Program1", "Program2"];
       mockServices.startup.listStartupPrograms.mockResolvedValue(mockPrograms);
 
       const getCalls = mockApp.get.mock.calls;
-      const startupCall = getCalls.find(call => call[0] === '/api/startup');
+      const startupCall = getCalls.find(call => call[0] === "/api/startup");
       const handler = startupCall[1];
       const mockRes = { json: jest.fn() };
 
       await handler({}, mockRes);
 
-      expect(mockRes.json).toHaveBeenCalledWith({ success: true, programs: mockPrograms });
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        programs: mockPrograms,
+      });
     });
   });
 
-  describe('GET /api/programs', () => {
-    test('should return installed programs', async () => {
-      const mockPrograms = ['Program1', 'Program2'];
-      mockServices.uninstaller.listInstalledPrograms.mockResolvedValue(mockPrograms);
+  describe("GET /api/programs", () => {
+    test("should return installed programs", async () => {
+      const mockPrograms = ["Program1", "Program2"];
+      mockServices.uninstaller.listInstalledPrograms.mockResolvedValue(
+        mockPrograms,
+      );
 
       const getCalls = mockApp.get.mock.calls;
-      const programsCall = getCalls.find(call => call[0] === '/api/programs');
+      const programsCall = getCalls.find(call => call[0] === "/api/programs");
       const handler = programsCall[1];
       const mockRes = { json: jest.fn() };
 
       await handler({}, mockRes);
 
-      expect(mockRes.json).toHaveBeenCalledWith({ success: true, programs: mockPrograms });
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        programs: mockPrograms,
+      });
     });
   });
 
-  describe('GET /api/dns', () => {
-    test('should return DNS info', async () => {
-      const mockDns = { primary: '8.8.8.8', secondary: '8.8.4.4' };
+  describe("GET /api/dns", () => {
+    test("should return DNS info", async () => {
+      const mockDns = { primary: "8.8.8.8", secondary: "8.8.4.4" };
       mockServices.dns.getCurrentDns.mockResolvedValue(mockDns);
 
       const getCalls = mockApp.get.mock.calls;
-      const dnsCall = getCalls.find(call => call[0] === '/api/dns');
+      const dnsCall = getCalls.find(call => call[0] === "/api/dns");
       const handler = dnsCall[1];
       const mockRes = { json: jest.fn() };
 
       await handler({}, mockRes);
 
-      expect(mockRes.json).toHaveBeenCalledWith({ success: true, dns: mockDns });
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        dns: mockDns,
+      });
     });
   });
 
-  describe('POST /api/network/ping', () => {
-    test('should run ping test', async () => {
-      const mockResult = { time: '10ms', host: '8.8.8.8' };
+  describe("POST /api/network/ping", () => {
+    test("should run ping test", async () => {
+      const mockResult = { time: "10ms", host: "8.8.8.8" };
       mockServices.network.runPingTest.mockResolvedValue(mockResult);
 
       const postCalls = mockApp.post.mock.calls;
-      const pingCall = postCalls.find(call => call[0] === '/api/network/ping');
+      const pingCall = postCalls.find(call => call[0] === "/api/network/ping");
       const handler = pingCall[1];
-      const mockReq = { body: { host: '8.8.8.8' } };
+      const mockReq = { body: { host: "8.8.8.8" } };
       const mockRes = { json: jest.fn() };
 
       await handler(mockReq, mockRes);
 
-      expect(mockServices.network.runPingTest).toHaveBeenCalledWith('8.8.8.8');
-      expect(mockRes.json).toHaveBeenCalledWith({ success: true, result: mockResult });
+      expect(mockServices.network.runPingTest).toHaveBeenCalledWith("8.8.8.8");
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        result: mockResult,
+      });
     });
 
-    test('should use default host if not provided', async () => {
+    test("should use default host if not provided", async () => {
       mockServices.network.runPingTest.mockResolvedValue({});
 
       const postCalls = mockApp.post.mock.calls;
-      const pingCall = postCalls.find(call => call[0] === '/api/network/ping');
+      const pingCall = postCalls.find(call => call[0] === "/api/network/ping");
       const handler = pingCall[1];
       const mockReq = { body: {} };
       const mockRes = { json: jest.fn() };
 
       await handler(mockReq, mockRes);
 
-      expect(mockServices.network.runPingTest).toHaveBeenCalledWith('8.8.8.8');
+      expect(mockServices.network.runPingTest).toHaveBeenCalledWith("8.8.8.8");
     });
   });
 
-  describe('GET /api/plugins', () => {
-    test('should return loaded plugins', async () => {
+  describe("GET /api/plugins", () => {
+    test("should return loaded plugins", async () => {
       const mockPlugins = [
-        { name: 'Plugin1', description: 'Desc1', version: '1.0.0' },
-        { name: 'Plugin2', description: 'Desc2', version: '2.0.0' },
+        { name: "Plugin1", description: "Desc1", version: "1.0.0" },
+        { name: "Plugin2", description: "Desc2", version: "2.0.0" },
       ];
       mockServices.plugin.getLoadedPlugins.mockReturnValue(mockPlugins);
 
       const getCalls = mockApp.get.mock.calls;
-      const pluginsCall = getCalls.find(call => call[0] === '/api/plugins');
+      const pluginsCall = getCalls.find(call => call[0] === "/api/plugins");
       const handler = pluginsCall[1];
       const mockRes = { json: jest.fn() };
 
@@ -346,8 +386,8 @@ describe('WebServer', () => {
     });
   });
 
-  describe('start', () => {
-    test('should start server successfully', async () => {
+  describe("start", () => {
+    test("should start server successfully", async () => {
       const mockServer = {
         on: jest.fn(),
         close: jest.fn(),
@@ -357,32 +397,36 @@ describe('WebServer', () => {
         return mockServer;
       });
 
-      await webServer.start(3000, '0.0.0.0');
+      await webServer.start(3000, "0.0.0.0");
 
-      expect(mockApp.listen).toHaveBeenCalledWith(3000, '0.0.0.0', expect.any(Function));
+      expect(mockApp.listen).toHaveBeenCalledWith(
+        3000,
+        "0.0.0.0",
+        expect.any(Function),
+      );
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Web server started')
+        expect.stringContaining("Web server started"),
       );
     });
 
-    test('should handle start errors', async () => {
+    test("should handle start errors", async () => {
       mockApp.listen.mockImplementation((_port, _host, _callback) => {
         const mockServer = {
           on: jest.fn((event, handler) => {
-            if (event === 'error') {
-              setTimeout(() => handler(new Error('Start error')), 0);
+            if (event === "error") {
+              setTimeout(() => handler(new Error("Start error")), 0);
             }
           }),
         };
         return mockServer;
       });
 
-      await expect(webServer.start(3000)).rejects.toThrow('Start error');
+      await expect(webServer.start(3000)).rejects.toThrow("Start error");
     });
   });
 
-  describe('stop', () => {
-    test('should stop server successfully', async () => {
+  describe("stop", () => {
+    test("should stop server successfully", async () => {
       const mockServer = {
         close: jest.fn(callback => {
           setTimeout(() => callback(), 0);
@@ -393,38 +437,40 @@ describe('WebServer', () => {
       await webServer.stop();
 
       expect(mockServer.close).toHaveBeenCalled();
-      expect(mockLogService.log).toHaveBeenCalledWith('Web server stopped');
+      expect(mockLogService.log).toHaveBeenCalledWith("Web server stopped");
     });
 
-    test('should handle stop when server is null', async () => {
+    test("should handle stop when server is null", async () => {
       webServer.server = null;
 
       await webServer.stop();
 
       // When server is null, it resolves immediately and logs
-      expect(mockLogService.log).toHaveBeenCalledWith('Web server stopped');
+      expect(mockLogService.log).toHaveBeenCalledWith("Web server stopped");
     });
   });
 
-  describe('serveFolder', () => {
-    test('should serve static folder', () => {
-      const folderPath = '/path/to/folder';
+  describe("serveFolder", () => {
+    test("should serve static folder", () => {
+      const folderPath = "/path/to/folder";
 
       webServer.serveFolder(folderPath);
 
       // Check that express.static was called with the folder path
       expect(express.static).toHaveBeenCalledWith(folderPath);
-      expect(mockLogService.log).toHaveBeenCalledWith(expect.stringContaining('Serving folder'));
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        expect.stringContaining("Serving folder"),
+      );
     });
   });
 
-  describe('getMainHTML', () => {
-    test('should return HTML string', () => {
+  describe("getMainHTML", () => {
+    test("should return HTML string", () => {
       const html = webServer.getMainHTML();
 
-      expect(typeof html).toBe('string');
-      expect(html).toContain('<!DOCTYPE html>');
-      expect(html).toContain('InvolveX CLI - Web Interface');
+      expect(typeof html).toBe("string");
+      expect(html).toContain("<!DOCTYPE html>");
+      expect(html).toContain("InvolveX CLI - Web Interface");
     });
   });
 });

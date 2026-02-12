@@ -1,8 +1,8 @@
-const SystemRestoreService = require('../services/SystemRestoreService');
-const { spawn } = require('child_process');
+const SystemRestoreService = require("../services/SystemRestoreService");
+const { spawn } = require("child_process");
 
 // Mock child_process.spawn
-jest.mock('child_process', () => ({
+jest.mock("child_process", () => ({
   spawn: jest.fn(),
 }));
 
@@ -11,7 +11,7 @@ const mockLogService = {
   log: jest.fn(),
 };
 
-describe('SystemRestoreService', () => {
+describe("SystemRestoreService", () => {
   let systemRestoreService;
 
   beforeEach(() => {
@@ -19,14 +19,14 @@ describe('SystemRestoreService', () => {
     systemRestoreService = new SystemRestoreService(mockLogService);
   });
 
-  describe('createRestorePoint', () => {
-    test('should create restore point successfully', async () => {
-      const mockStdout = 'SUCCESS';
+  describe("createRestorePoint", () => {
+    test("should create restore point successfully", async () => {
+      const mockStdout = "SUCCESS";
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(0), 0);
           }
         }),
@@ -34,34 +34,35 @@ describe('SystemRestoreService', () => {
 
       let stdoutCallback;
       mockProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           stdoutCallback = callback;
         }
       });
 
       spawn.mockReturnValue(mockProcess);
 
-      const promise = systemRestoreService.createRestorePoint('Test Restore Point');
+      const promise =
+        systemRestoreService.createRestorePoint("Test Restore Point");
       stdoutCallback(Buffer.from(mockStdout));
 
       const result = await promise;
 
       expect(result).toBe(true);
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Creating system restore point')
+        expect.stringContaining("Creating system restore point"),
       );
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('created successfully')
+        expect.stringContaining("created successfully"),
       );
     });
 
-    test('should return false if restore point already exists', async () => {
-      const mockStdout = 'Restore point already exists';
+    test("should return false if restore point already exists", async () => {
+      const mockStdout = "Restore point already exists";
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(1), 0);
           }
         }),
@@ -69,55 +70,57 @@ describe('SystemRestoreService', () => {
 
       let stdoutCallback;
       mockProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           stdoutCallback = callback;
         }
       });
 
       spawn.mockReturnValue(mockProcess);
 
-      const promise = systemRestoreService.createRestorePoint('Test Restore Point');
+      const promise =
+        systemRestoreService.createRestorePoint("Test Restore Point");
       stdoutCallback(Buffer.from(mockStdout));
 
       const result = await promise;
 
       expect(result).toBe(false);
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to create restore point')
+        expect.stringContaining("Failed to create restore point"),
       );
     });
 
-    test('should handle errors', async () => {
+    test("should handle errors", async () => {
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'error') {
-            setTimeout(() => callback(new Error('Process error')), 0);
+          if (event === "error") {
+            setTimeout(() => callback(new Error("Process error")), 0);
           }
         }),
       };
 
       spawn.mockReturnValue(mockProcess);
 
-      const result = await systemRestoreService.createRestorePoint('Test Restore Point');
+      const result =
+        await systemRestoreService.createRestorePoint("Test Restore Point");
 
       expect(result).toBe(false);
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Error creating restore point')
+        expect.stringContaining("Error creating restore point"),
       );
     });
   });
 
-  describe('listRestorePoints', () => {
-    test('should list restore points successfully', async () => {
+  describe("listRestorePoints", () => {
+    test("should list restore points successfully", async () => {
       const mockStdout =
-        'Sequence: 1 - Test Restore Point - 2024-01-01 12:00:00\nSequence: 2 - Another Point - 2024-01-02 12:00:00';
+        "Sequence: 1 - Test Restore Point - 2024-01-01 12:00:00\nSequence: 2 - Another Point - 2024-01-02 12:00:00";
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(0), 0);
           }
         }),
@@ -125,7 +128,7 @@ describe('SystemRestoreService', () => {
 
       let stdoutCallback;
       mockProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           stdoutCallback = callback;
         }
       });
@@ -137,18 +140,20 @@ describe('SystemRestoreService', () => {
 
       const result = await promise;
 
-      expect(result).toContain('Sequence: 1');
-      expect(result).toContain('Sequence: 2');
-      expect(mockLogService.log).toHaveBeenCalledWith('Listing system restore points');
+      expect(result).toContain("Sequence: 1");
+      expect(result).toContain("Sequence: 2");
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        "Listing system restore points",
+      );
     });
 
-    test('should handle no restore points', async () => {
-      const mockStdout = 'No restore points found';
+    test("should handle no restore points", async () => {
+      const mockStdout = "No restore points found";
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(0), 0);
           }
         }),
@@ -156,7 +161,7 @@ describe('SystemRestoreService', () => {
 
       let stdoutCallback;
       mockProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           stdoutCallback = callback;
         }
       });
@@ -168,16 +173,16 @@ describe('SystemRestoreService', () => {
 
       const result = await promise;
 
-      expect(result).toContain('No restore points found');
+      expect(result).toContain("No restore points found");
     });
 
-    test('should handle errors', async () => {
+    test("should handle errors", async () => {
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'error') {
-            setTimeout(() => callback(new Error('Process error')), 0);
+          if (event === "error") {
+            setTimeout(() => callback(new Error("Process error")), 0);
           }
         }),
       };
@@ -186,21 +191,21 @@ describe('SystemRestoreService', () => {
 
       const result = await systemRestoreService.listRestorePoints();
 
-      expect(result).toContain('Error: Process error');
+      expect(result).toContain("Error: Process error");
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Error listing restore points')
+        expect.stringContaining("Error listing restore points"),
       );
     });
   });
 
-  describe('deleteRestorePoint', () => {
-    test('should return false if restore point not found', async () => {
-      const mockStdout = 'NOT_FOUND';
+  describe("deleteRestorePoint", () => {
+    test("should return false if restore point not found", async () => {
+      const mockStdout = "NOT_FOUND";
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(1), 0);
           }
         }),
@@ -208,37 +213,7 @@ describe('SystemRestoreService', () => {
 
       let stdoutCallback;
       mockProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
-          stdoutCallback = callback;
-        }
-      });
-
-      spawn.mockReturnValue(mockProcess);
-
-      const promise = systemRestoreService.deleteRestorePoint(1);
-      stdoutCallback(Buffer.from(mockStdout));
-
-      const result = await promise;
-
-      expect(result).toBe(false);
-      expect(mockLogService.log).toHaveBeenCalledWith('Restore point not found');
-    });
-
-    test('should return false if deletion not supported', async () => {
-      const mockStdout = 'DELETE_NOT_SUPPORTED';
-      const mockProcess = {
-        stdout: { on: jest.fn() },
-        stderr: { on: jest.fn() },
-        on: jest.fn((event, callback) => {
-          if (event === 'close') {
-            setTimeout(() => callback(1), 0);
-          }
-        }),
-      };
-
-      let stdoutCallback;
-      mockProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           stdoutCallback = callback;
         }
       });
@@ -252,17 +227,49 @@ describe('SystemRestoreService', () => {
 
       expect(result).toBe(false);
       expect(mockLogService.log).toHaveBeenCalledWith(
-        'Individual restore point deletion not supported'
+        "Restore point not found",
       );
     });
 
-    test('should handle errors', async () => {
+    test("should return false if deletion not supported", async () => {
+      const mockStdout = "DELETE_NOT_SUPPORTED";
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'error') {
-            setTimeout(() => callback(new Error('Process error')), 0);
+          if (event === "close") {
+            setTimeout(() => callback(1), 0);
+          }
+        }),
+      };
+
+      let stdoutCallback;
+      mockProcess.stdout.on.mockImplementation((event, callback) => {
+        if (event === "data") {
+          stdoutCallback = callback;
+        }
+      });
+
+      spawn.mockReturnValue(mockProcess);
+
+      const promise = systemRestoreService.deleteRestorePoint(1);
+      stdoutCallback(Buffer.from(mockStdout));
+
+      const result = await promise;
+
+      expect(result).toBe(false);
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        "Individual restore point deletion not supported",
+      );
+    });
+
+    test("should handle errors", async () => {
+      const mockProcess = {
+        stdout: { on: jest.fn() },
+        stderr: { on: jest.fn() },
+        on: jest.fn((event, callback) => {
+          if (event === "error") {
+            setTimeout(() => callback(new Error("Process error")), 0);
           }
         }),
       };
@@ -273,19 +280,19 @@ describe('SystemRestoreService', () => {
 
       expect(result).toBe(false);
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Error deleting restore point')
+        expect.stringContaining("Error deleting restore point"),
       );
     });
   });
 
-  describe('deleteOldRestorePoints', () => {
-    test('should return true if no old restore points to delete', async () => {
-      const mockStdout = 'No old restore points to delete';
+  describe("deleteOldRestorePoints", () => {
+    test("should return true if no old restore points to delete", async () => {
+      const mockStdout = "No old restore points to delete";
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(0), 0);
           }
         }),
@@ -293,7 +300,7 @@ describe('SystemRestoreService', () => {
 
       let stdoutCallback;
       mockProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           stdoutCallback = callback;
         }
       });
@@ -306,16 +313,18 @@ describe('SystemRestoreService', () => {
       const result = await promise;
 
       expect(result).toBe(true);
-      expect(mockLogService.log).toHaveBeenCalledWith('No old restore points to delete');
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        "No old restore points to delete",
+      );
     });
 
-    test('should return false if deletion not supported', async () => {
-      const mockStdout = 'DELETE_OLD_NOT_SUPPORTED';
+    test("should return false if deletion not supported", async () => {
+      const mockStdout = "DELETE_OLD_NOT_SUPPORTED";
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(1), 0);
           }
         }),
@@ -323,7 +332,7 @@ describe('SystemRestoreService', () => {
 
       let stdoutCallback;
       mockProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           stdoutCallback = callback;
         }
       });
@@ -336,16 +345,18 @@ describe('SystemRestoreService', () => {
       const result = await promise;
 
       expect(result).toBe(false);
-      expect(mockLogService.log).toHaveBeenCalledWith(expect.stringContaining('not supported'));
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        expect.stringContaining("not supported"),
+      );
     });
 
-    test('should handle errors', async () => {
+    test("should handle errors", async () => {
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'error') {
-            setTimeout(() => callback(new Error('Process error')), 0);
+          if (event === "error") {
+            setTimeout(() => callback(new Error("Process error")), 0);
           }
         }),
       };
@@ -356,20 +367,20 @@ describe('SystemRestoreService', () => {
 
       expect(result).toBe(false);
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Error deleting old restore points')
+        expect.stringContaining("Error deleting old restore points"),
       );
     });
   });
 
-  describe('runProcess', () => {
-    test('should run process and return result', async () => {
-      const mockStdout = 'output';
-      const mockStderr = 'error output';
+  describe("runProcess", () => {
+    test("should run process and return result", async () => {
+      const mockStdout = "output";
+      const mockStderr = "error output";
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'close') {
+          if (event === "close") {
             setTimeout(() => callback(0), 0);
           }
         }),
@@ -377,19 +388,22 @@ describe('SystemRestoreService', () => {
 
       let stdoutCallback, stderrCallback;
       mockProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           stdoutCallback = callback;
         }
       });
       mockProcess.stderr.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
+        if (event === "data") {
           stderrCallback = callback;
         }
       });
 
       spawn.mockReturnValue(mockProcess);
 
-      const promise = systemRestoreService.runProcess('command', ['arg1', 'arg2']);
+      const promise = systemRestoreService.runProcess("command", [
+        "arg1",
+        "arg2",
+      ]);
       stdoutCallback(Buffer.from(mockStdout));
       stderrCallback(Buffer.from(mockStderr));
 
@@ -400,26 +414,28 @@ describe('SystemRestoreService', () => {
         stdout: mockStdout,
         stderr: mockStderr,
       });
-      expect(spawn).toHaveBeenCalledWith('command', ['arg1', 'arg2'], {
-        stdio: ['pipe', 'pipe', 'pipe'],
+      expect(spawn).toHaveBeenCalledWith("command", ["arg1", "arg2"], {
+        stdio: ["pipe", "pipe", "pipe"],
         shell: true,
       });
     });
 
-    test('should handle process errors', async () => {
+    test("should handle process errors", async () => {
       const mockProcess = {
         stdout: { on: jest.fn() },
         stderr: { on: jest.fn() },
         on: jest.fn((event, callback) => {
-          if (event === 'error') {
-            setTimeout(() => callback(new Error('Spawn error')), 0);
+          if (event === "error") {
+            setTimeout(() => callback(new Error("Spawn error")), 0);
           }
         }),
       };
 
       spawn.mockReturnValue(mockProcess);
 
-      await expect(systemRestoreService.runProcess('command', [])).rejects.toThrow('Spawn error');
+      await expect(
+        systemRestoreService.runProcess("command", []),
+      ).rejects.toThrow("Spawn error");
     });
   });
 });

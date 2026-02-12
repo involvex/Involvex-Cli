@@ -1,19 +1,19 @@
-const CacheService = require('../services/CacheService');
-const os = require('os');
-const path = require('path');
+const CacheService = require("../services/CacheService");
+const path = require("path");
+const os = require("os");
 
 // Mock child_process.spawn
-jest.mock('child_process', () => ({
+jest.mock("child_process", () => ({
   spawn: jest.fn(),
 }));
 
 // Mock os.tmpdir
-jest.mock('os', () => ({
+jest.mock("os", () => ({
   tmpdir: jest.fn(),
 }));
 
 // Mock fs.promises
-jest.mock('fs', () => ({
+jest.mock("fs", () => ({
   promises: {
     readdir: jest.fn(),
     stat: jest.fn(),
@@ -24,16 +24,16 @@ jest.mock('fs', () => ({
   },
 }));
 
-const fs = require('fs').promises;
+const fs = require("fs").promises;
 
 // Mock LogService
 const mockLogService = {
   log: jest.fn(),
 };
 
-describe('CacheService', () => {
+describe("CacheService", () => {
   let cacheService;
-  const mockTempDir = '/mock/temp';
+  const mockTempDir = "/mock/temp";
   const originalPlatform = process.platform;
 
   beforeEach(() => {
@@ -46,160 +46,206 @@ describe('CacheService', () => {
     global.gc = jest.fn();
 
     // Default mock for runProcess in CacheService
-    cacheService.runProcess = jest.fn().mockResolvedValue({ code: 0, stdout: '', stderr: '' });
+    cacheService.runProcess = jest
+      .fn()
+      .mockResolvedValue({ code: 0, stdout: "", stderr: "" });
   });
 
   afterAll(() => {
-    Object.defineProperty(process, 'platform', { value: originalPlatform });
+    Object.defineProperty(process, "platform", { value: originalPlatform });
   });
 
-  describe('clearSystemCache', () => {
-    test('should clear user-specific temporary files and npm cache on non-Windows', async () => {
-      Object.defineProperty(process, 'platform', { value: 'linux' }); // Mock as non-Windows
+  describe("clearSystemCache", () => {
+    test("should clear user-specific temporary files and npm cache on non-Windows", async () => {
+      Object.defineProperty(process, "platform", { value: "linux" }); // Mock as non-Windows
 
       fs.stat.mockResolvedValue({ isDirectory: () => true });
-      fs.readdir.mockResolvedValue(['file1.txt', 'dir1']);
+      fs.readdir.mockResolvedValue(["file1.txt", "dir1"]);
       fs.unlink.mockResolvedValue();
       fs.rmdir.mockResolvedValue();
 
       const result = await cacheService.clearSystemCache();
 
       expect(result).toBe(true);
-      expect(mockLogService.log).toHaveBeenCalledWith('Starting system cache clearing operation.');
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        "Starting system cache clearing operation.",
+      );
       expect(fs.readdir).toHaveBeenCalledWith(mockTempDir);
-      expect(fs.unlink).toHaveBeenCalledWith(path.join(mockTempDir, 'file1.txt'));
-      expect(cacheService.runProcess).toHaveBeenCalledWith('npm', ['cache', 'clean', '--force']);
-      expect(cacheService.runProcess).not.toHaveBeenCalledWith('powershell', expect.any(Array)); // No PowerShell on non-Windows
-      expect(mockLogService.log).toHaveBeenCalledWith('System cache cleared successfully.');
+      expect(fs.unlink).toHaveBeenCalledWith(
+        path.join(mockTempDir, "file1.txt"),
+      );
+      expect(cacheService.runProcess).toHaveBeenCalledWith("npm", [
+        "cache",
+        "clean",
+        "--force",
+      ]);
+      expect(cacheService.runProcess).not.toHaveBeenCalledWith(
+        "powershell",
+        expect.any(Array),
+      ); // No PowerShell on non-Windows
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        "System cache cleared successfully.",
+      );
     });
 
-    test('should clear user-specific temporary files, npm cache, and Windows temp files on Windows', async () => {
-      Object.defineProperty(process, 'platform', { value: 'win32' }); // Mock as Windows
+    test("should clear user-specific temporary files, npm cache, and Windows temp files on Windows", async () => {
+      Object.defineProperty(process, "platform", { value: "win32" }); // Mock as Windows
 
       fs.stat.mockResolvedValue({ isDirectory: () => true });
-      fs.readdir.mockResolvedValue(['file1.txt', 'dir1']);
+      fs.readdir.mockResolvedValue(["file1.txt", "dir1"]);
       fs.unlink.mockResolvedValue();
       fs.rmdir.mockResolvedValue();
 
       const result = await cacheService.clearSystemCache();
 
       expect(result).toBe(true);
-      expect(cacheService.runProcess).toHaveBeenCalledWith('npm', ['cache', 'clean', '--force']);
-      expect(cacheService.runProcess).toHaveBeenCalledWith('powershell', expect.any(Array)); // PowerShell on Windows
-      expect(mockLogService.log).toHaveBeenCalledWith('Windows temp files cleared.');
+      expect(cacheService.runProcess).toHaveBeenCalledWith("npm", [
+        "cache",
+        "clean",
+        "--force",
+      ]);
+      expect(cacheService.runProcess).toHaveBeenCalledWith(
+        "powershell",
+        expect.any(Array),
+      ); // PowerShell on Windows
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        "Windows temp files cleared.",
+      );
     });
 
-    test('should handle errors during temporary file deletion gracefully', async () => {
-      Object.defineProperty(process, 'platform', { value: 'linux' });
+    test("should handle errors during temporary file deletion gracefully", async () => {
+      Object.defineProperty(process, "platform", { value: "linux" });
 
       fs.stat.mockResolvedValue({ isDirectory: () => true });
-      fs.readdir.mockResolvedValue(['file1.txt']);
-      fs.unlink.mockRejectedValue(new Error('Permission denied')); // Simulate error
+      fs.readdir.mockResolvedValue(["file1.txt"]);
+      fs.unlink.mockRejectedValue(new Error("Permission denied")); // Simulate error
 
       const result = await cacheService.clearSystemCache();
 
       expect(result).toBe(true); // Operation still succeeds overall
-      expect(mockLogService.log).toHaveBeenCalledWith(expect.stringContaining('Could not delete'));
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        expect.stringContaining("Could not delete"),
+      );
     });
 
-    test('should log error if npm cache clearing fails', async () => {
-      Object.defineProperty(process, 'platform', { value: 'linux' });
+    test("should log error if npm cache clearing fails", async () => {
+      Object.defineProperty(process, "platform", { value: "linux" });
       cacheService.runProcess.mockImplementation((cmd, _args) => {
-        if (cmd === 'npm') {
-          return Promise.resolve({ code: 1, stdout: '', stderr: 'npm error' });
+        if (cmd === "npm") {
+          return Promise.resolve({ code: 1, stdout: "", stderr: "npm error" });
         }
-        return Promise.resolve({ code: 0, stdout: '', stderr: '' });
+        return Promise.resolve({ code: 0, stdout: "", stderr: "" });
       });
 
       const result = await cacheService.clearSystemCache();
 
       expect(result).toBe(true);
       expect(mockLogService.log).toHaveBeenCalledWith(
-        'NPM cache clearing failed or npm not available.'
+        "NPM cache clearing failed or npm not available.",
       );
     });
 
-    test('should log error if Windows temp file clearing fails', async () => {
-      Object.defineProperty(process, 'platform', { value: 'win32' });
+    test("should log error if Windows temp file clearing fails", async () => {
+      Object.defineProperty(process, "platform", { value: "win32" });
       cacheService.runProcess.mockImplementation((cmd, _args) => {
-        if (cmd === 'powershell') {
-          return Promise.resolve({ code: 1, stdout: '', stderr: 'powershell error' });
+        if (cmd === "powershell") {
+          return Promise.resolve({
+            code: 1,
+            stdout: "",
+            stderr: "powershell error",
+          });
         }
-        return Promise.resolve({ code: 0, stdout: '', stderr: '' });
+        return Promise.resolve({ code: 0, stdout: "", stderr: "" });
       });
 
       const result = await cacheService.clearSystemCache();
 
       expect(result).toBe(true);
-      expect(mockLogService.log).toHaveBeenCalledWith('Failed to clear Windows temp files');
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        "Failed to clear Windows temp files",
+      );
     });
 
-    test('should return false and log error if overall operation fails', async () => {
-      Object.defineProperty(process, 'platform', { value: 'linux' });
-      fs.readdir.mockRejectedValue(new Error('FS read error'));
+    test("should return false and log error if overall operation fails", async () => {
+      Object.defineProperty(process, "platform", { value: "linux" });
+      fs.readdir.mockRejectedValue(new Error("FS read error"));
 
       const result = await cacheService.clearSystemCache();
 
       expect(result).toBe(false);
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Error clearing system cache: FS read error')
+        expect.stringContaining("Error clearing system cache: FS read error"),
       );
     });
   });
 
-  describe('clearMemory', () => {
-    test('should trigger Node.js garbage collection on non-Windows', async () => {
-      Object.defineProperty(process, 'platform', { value: 'linux' });
+  describe("clearMemory", () => {
+    test("should trigger Node.js garbage collection on non-Windows", async () => {
+      Object.defineProperty(process, "platform", { value: "linux" });
 
       const result = await cacheService.clearMemory();
 
       expect(result).toBe(true);
       expect(global.gc).toHaveBeenCalledTimes(2); // Once at start, once at end
-      expect(cacheService.runProcess).not.toHaveBeenCalledWith('powershell', expect.any(Array));
-      expect(mockLogService.log).toHaveBeenCalledWith('Node.js garbage collection triggered.');
-      expect(mockLogService.log).toHaveBeenCalledWith('Memory clearing operations completed.');
+      expect(cacheService.runProcess).not.toHaveBeenCalledWith(
+        "powershell",
+        expect.any(Array),
+      );
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        "Node.js garbage collection triggered.",
+      );
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        "Memory clearing operations completed.",
+      );
     });
 
-    test('should trigger Node.js garbage collection and PowerShell script on Windows', async () => {
-      Object.defineProperty(process, 'platform', { value: 'win32' });
+    test("should trigger Node.js garbage collection and PowerShell script on Windows", async () => {
+      Object.defineProperty(process, "platform", { value: "win32" });
 
       const result = await cacheService.clearMemory();
 
       expect(result).toBe(true);
       expect(global.gc).toHaveBeenCalledTimes(2);
-      expect(cacheService.runProcess).toHaveBeenCalledWith('powershell', expect.any(Array));
-      expect(mockLogService.log).toHaveBeenCalledWith('Node.js garbage collection triggered.');
-      expect(mockLogService.log).toHaveBeenCalledWith('Memory clearing operations completed.');
+      expect(cacheService.runProcess).toHaveBeenCalledWith(
+        "powershell",
+        expect.any(Array),
+      );
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        "Node.js garbage collection triggered.",
+      );
+      expect(mockLogService.log).toHaveBeenCalledWith(
+        "Memory clearing operations completed.",
+      );
     });
 
-    test('should return false and log error if overall operation fails', async () => {
-      Object.defineProperty(process, 'platform', { value: 'win32' });
-      cacheService.runProcess.mockRejectedValue(new Error('PowerShell error'));
+    test("should return false and log error if overall operation fails", async () => {
+      Object.defineProperty(process, "platform", { value: "win32" });
+      cacheService.runProcess.mockRejectedValue(new Error("PowerShell error"));
 
       const result = await cacheService.clearMemory();
 
       expect(result).toBe(false);
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining('Error clearing memory: PowerShell error')
+        expect.stringContaining("Error clearing memory: PowerShell error"),
       );
     });
   });
 
-  describe('deleteDirectoryContents', () => {
-    test('should recursively delete files and directories', async () => {
-      const testDir = '/test/dir';
-      const file1 = path.join(testDir, 'file1.txt');
-      const subDir = path.join(testDir, 'subDir');
-      const file2 = path.join(subDir, 'file2.txt');
+  describe("deleteDirectoryContents", () => {
+    test("should recursively delete files and directories", async () => {
+      const testDir = "/test/dir";
+      const file1 = path.join(testDir, "file1.txt");
+      const subDir = path.join(testDir, "subDir");
+      const file2 = path.join(subDir, "file2.txt");
 
       fs.stat.mockImplementation(async p => {
         if (p === testDir || p === subDir) return { isDirectory: () => true };
         if (p === file1 || p === file2) return { isDirectory: () => false };
-        throw new Error('Not found');
+        throw new Error("Not found");
       });
       fs.readdir.mockImplementation(async p => {
-        if (p === testDir) return ['file1.txt', 'subDir'];
-        if (p === subDir) return ['file2.txt'];
+        if (p === testDir) return ["file1.txt", "subDir"];
+        if (p === subDir) return ["file2.txt"];
         return [];
       });
       fs.unlink.mockResolvedValue();
@@ -211,39 +257,39 @@ describe('CacheService', () => {
       expect(fs.unlink).toHaveBeenCalledWith(file2);
       expect(fs.rmdir).toHaveBeenCalledWith(subDir);
       expect(mockLogService.log).not.toHaveBeenCalledWith(
-        expect.stringContaining('Could not delete')
+        expect.stringContaining("Could not delete"),
       );
     });
 
-    test('should log errors for inaccessible files/directories during deletion', async () => {
-      const testDir = '/test/dir';
-      const file1 = path.join(testDir, 'file1.txt');
+    test("should log errors for inaccessible files/directories during deletion", async () => {
+      const testDir = "/test/dir";
+      const file1 = path.join(testDir, "file1.txt");
 
       fs.stat.mockImplementation(async p => {
         if (p === testDir) return { isDirectory: () => true };
         if (p === file1) return { isDirectory: () => false };
-        throw new Error('Not found');
+        throw new Error("Not found");
       });
-      fs.readdir.mockResolvedValue(['file1.txt']);
-      fs.unlink.mockRejectedValue(new Error('Access denied'));
+      fs.readdir.mockResolvedValue(["file1.txt"]);
+      fs.unlink.mockRejectedValue(new Error("Access denied"));
 
       await cacheService.deleteDirectoryContents(testDir);
 
       expect(fs.unlink).toHaveBeenCalledWith(file1);
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining(`Could not delete ${file1}: Access denied`)
+        expect.stringContaining(`Could not delete ${file1}: Access denied`),
       );
     });
 
-    test('should handle non-existent directory gracefully', async () => {
-      const testDir = '/non/existent/dir';
-      fs.stat.mockRejectedValue(new Error('ENOENT'));
+    test("should handle non-existent directory gracefully", async () => {
+      const testDir = "/non/existent/dir";
+      fs.stat.mockRejectedValue(new Error("ENOENT"));
 
       await cacheService.deleteDirectoryContents(testDir);
 
       expect(fs.readdir).not.toHaveBeenCalled();
       expect(mockLogService.log).toHaveBeenCalledWith(
-        expect.stringContaining(`Error accessing directory ${testDir}: ENOENT`)
+        expect.stringContaining(`Error accessing directory ${testDir}: ENOENT`),
       );
     });
   });

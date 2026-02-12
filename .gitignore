@@ -126,3 +126,8 @@ coverage/
 
 # ESLint cache
 .eslintcache
+
+.mira
+*.log
+*-errors.txt
+*.txt

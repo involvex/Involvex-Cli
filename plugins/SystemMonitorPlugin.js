@@ -1,13 +1,14 @@
-const os = require('os');
-const { spawn } = require('child_process');
-const blessed = require('blessed');
+const { spawn } = require("child_process");
+const blessed = require("blessed");
+const os = require("os");
 
 class SystemMonitorPlugin {
   constructor() {
-    this.name = 'SystemMonitor';
-    this.description = 'Real-time system monitoring (CPU, GPU, Memory, Drive usage)';
-    this.version = '1.0.0';
-    this.author = 'InvolveX';
+    this.name = "SystemMonitor";
+    this.description =
+      "Real-time system monitoring (CPU, GPU, Memory, Drive usage)";
+    this.version = "1.0.0";
+    this.author = "InvolveX";
     this.updateInterval = null;
     this.isRunning = false;
   }
@@ -28,16 +29,18 @@ class SystemMonitorPlugin {
       const cpus = os.cpus();
       const totalIdle = cpus.reduce((acc, cpu) => acc + cpu.times.idle, 0);
       const totalTick = cpus.reduce(
-        (acc, cpu) => acc + Object.values(cpu.times).reduce((sum, time) => sum + time, 0),
-        0
+        (acc, cpu) =>
+          acc + Object.values(cpu.times).reduce((sum, time) => sum + time, 0),
+        0,
       );
 
       setTimeout(() => {
         const cpus2 = os.cpus();
         const totalIdle2 = cpus2.reduce((acc, cpu) => acc + cpu.times.idle, 0);
         const totalTick2 = cpus2.reduce(
-          (acc, cpu) => acc + Object.values(cpu.times).reduce((sum, time) => sum + time, 0),
-          0
+          (acc, cpu) =>
+            acc + Object.values(cpu.times).reduce((sum, time) => sum + time, 0),
+          0,
         );
 
         const idle = totalIdle2 - totalIdle;
@@ -64,7 +67,7 @@ class SystemMonitorPlugin {
 
   async getDriveUsage() {
     return new Promise(resolve => {
-      if (process.platform !== 'win32') {
+      if (process.platform !== "win32") {
         resolve([]);
         return;
       }
@@ -83,34 +86,36 @@ class SystemMonitorPlugin {
         }
       `;
 
-      const process = spawn('powershell', ['-Command', psScript], {
+      const process = spawn("powershell", ["-Command", psScript], {
         shell: true,
       });
 
-      let stdout = '';
-      process.stdout.on('data', data => {
+      let stdout = "";
+      process.stdout.on("data", data => {
         stdout += data.toString();
       });
 
-      process.on('close', () => {
+      process.on("close", () => {
         const lines = stdout
           .trim()
-          .split('\n')
+          .split("\n")
           .filter(line => line.trim());
         const result = lines.map(line => {
-          const [drive, total, used, percent] = line.split('|');
+          const [drive, total, used, percent] = line.split("|");
           return {
-            drive: drive || 'Unknown',
+            drive: drive || "Unknown",
             total: this.formatBytes(parseInt(total) || 0),
             used: this.formatBytes(parseInt(used) || 0),
-            free: this.formatBytes((parseInt(total) || 0) - (parseInt(used) || 0)),
+            free: this.formatBytes(
+              (parseInt(total) || 0) - (parseInt(used) || 0),
+            ),
             percentage: parseFloat(percent) || 0,
           };
         });
         resolve(result);
       });
 
-      process.on('error', () => {
+      process.on("error", () => {
         resolve([]);
       });
     });
@@ -118,8 +123,8 @@ class SystemMonitorPlugin {
 
   async getGpuUsage() {
     return new Promise(resolve => {
-      if (process.platform !== 'win32') {
-        resolve({ usage: 0, memory: { used: '0 MB', total: '0 MB' } });
+      if (process.platform !== "win32") {
+        resolve({ usage: 0, memory: { used: "0 MB", total: "0 MB" } });
         return;
       }
 
@@ -137,40 +142,40 @@ class SystemMonitorPlugin {
         }
       `;
 
-      const process = spawn('powershell', ['-Command', psScript], {
+      const process = spawn("powershell", ["-Command", psScript], {
         shell: true,
       });
 
-      let stdout = '';
-      process.stdout.on('data', data => {
+      let stdout = "";
+      process.stdout.on("data", data => {
         stdout += data.toString();
       });
 
-      process.on('close', () => {
+      process.on("close", () => {
         const line = stdout.trim();
-        if (line && line.includes('|')) {
-          const [, name, memory] = line.split('|');
+        if (line && line.includes("|")) {
+          const [, name, memory] = line.split("|");
           resolve({
-            name: name || 'Unknown',
+            name: name || "Unknown",
             memory: {
               total: `${parseFloat(memory) || 0} MB`,
-              used: 'N/A',
+              used: "N/A",
             },
             usage: 0, // GPU usage requires additional tools
           });
         } else {
           resolve({
-            name: 'Unknown',
-            memory: { total: '0 MB', used: 'N/A' },
+            name: "Unknown",
+            memory: { total: "0 MB", used: "N/A" },
             usage: 0,
           });
         }
       });
 
-      process.on('error', () => {
+      process.on("error", () => {
         resolve({
-          name: 'Unknown',
-          memory: { total: '0 MB', used: 'N/A' },
+          name: "Unknown",
+          memory: { total: "0 MB", used: "N/A" },
           usage: 0,
         });
       });
@@ -178,11 +183,11 @@ class SystemMonitorPlugin {
   }
 
   formatBytes(bytes) {
-    if (bytes === 0) return '0 B';
+    if (bytes === 0) return "0 B";
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
   }
 
   async getSystemInfo() {
@@ -197,7 +202,7 @@ class SystemMonitorPlugin {
       cpu: {
         usage: cpuUsage,
         cores: os.cpus().length,
-        model: os.cpus()[0]?.model || 'Unknown',
+        model: os.cpus()[0]?.model || "Unknown",
       },
       memory: memoryUsage,
       drives: driveUsage,
@@ -219,19 +224,19 @@ class SystemMonitorPlugin {
   async displayMonitor(screen) {
     this.isRunning = true;
     const monitorBox = blessed.box({
-      top: 'center',
-      left: 'center',
-      width: '80%',
-      height: '80%',
+      top: "center",
+      left: "center",
+      width: "80%",
+      height: "80%",
       border: {
-        type: 'line',
+        type: "line",
       },
-      label: ' System Monitor ',
+      label: " System Monitor ",
       style: {
         border: {
-          fg: 'green',
+          fg: "green",
         },
-        fg: 'green',
+        fg: "green",
       },
       scrollable: true,
       alwaysScroll: true,
@@ -245,7 +250,7 @@ class SystemMonitorPlugin {
 
       try {
         const info = await this.getSystemInfo();
-        let content = '';
+        let content = "";
 
         // CPU Info
         content += `{green-fg}CPU:{/green-fg}\n`;
@@ -276,7 +281,7 @@ class SystemMonitorPlugin {
             content += `    Usage: ${this.getProgressBar(drive.percentage, 100)} ${drive.percentage}%\n`;
           });
         } else {
-          content += '  No drive information available\n';
+          content += "  No drive information available\n";
         }
 
         content += `\n{green-fg}System Info:{/green-fg}\n`;
@@ -299,7 +304,7 @@ class SystemMonitorPlugin {
     this.updateInterval = setInterval(updateDisplay, 2000);
 
     // Handle exit
-    monitorBox.key(['escape', 'q'], () => {
+    monitorBox.key(["escape", "q"], () => {
       this.isRunning = false;
       if (this.updateInterval) {
         clearInterval(this.updateInterval);
@@ -314,10 +319,10 @@ class SystemMonitorPlugin {
   getProgressBar(value, max, length = 20) {
     const filled = Math.round((value / max) * length);
     const empty = length - filled;
-    const bar = '█'.repeat(filled) + '░'.repeat(empty);
-    let color = 'green';
-    if (value > 80) color = 'red';
-    else if (value > 60) color = 'yellow';
+    const bar = "█".repeat(filled) + "░".repeat(empty);
+    let color = "green";
+    if (value > 80) color = "red";
+    else if (value > 60) color = "yellow";
     return `{${color}-fg}${bar}{/${color}-fg}`;
   }
   async execute(screen) {
