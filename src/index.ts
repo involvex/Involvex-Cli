@@ -212,6 +212,7 @@ async function main() {
           storage: storageManagerService,
           uninstaller: uninstallerService,
           settings: settingsService,
+          plugin: pluginService,
         },
         VERSION,
       );

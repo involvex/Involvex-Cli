@@ -23,7 +23,7 @@ interface CLIUIServices {
   storage: StorageManagerService;
   uninstaller: UninstallerService;
   settings: SettingsService;
-  plugin?: PluginService;
+  plugin: PluginService;
 }
 
 interface MenuItem {
@@ -46,7 +46,6 @@ export default class CLIUI {
   private speedTestService: SpeedTestService;
   private networkService: NetworkService;
   private lastSpeedTestResult: unknown = null;
-  private pluginService: PluginService | null = null;
 
   constructor(services: CLIUIServices, version: string) {
     this.services = services;
@@ -58,7 +57,6 @@ export default class CLIUI {
     this.menuStack = new MenuStackService(services.log);
     this.speedTestService = new SpeedTestService(services.log);
     this.networkService = new NetworkService(services.log);
-    this.pluginService = services.plugin ?? null;
 
     this.menuItems = [
       {
@@ -784,18 +782,6 @@ export default class CLIUI {
   }
 
   private async showPluginConfiguration(): Promise<void> {
-    // Check if plugin service is available
-    if (!this.pluginService) {
-      console.clear();
-      this.animationHelper.showHeader("Plugin Configuration");
-      console.log();
-      this.animationHelper.showWarning(
-        "Plugin service is not available in this context.",
-      );
-      await this.pressAnyKeyToContinue();
-      return;
-    }
-
     while (true) {
       console.clear();
       this.animationHelper.showHeader("🔌 Plugin Configuration");
@@ -837,12 +823,10 @@ export default class CLIUI {
   }
 
   private async listInstalledPlugins(): Promise<void> {
-    if (!this.pluginService) return;
-
     console.clear();
     this.animationHelper.showHeader("Installed Plugins");
 
-    const plugins = this.pluginService.getPluginNames();
+    const plugins = this.services.plugin.getPluginNames();
 
     if (plugins.length === 0) {
       console.log();
@@ -857,7 +841,7 @@ export default class CLIUI {
     );
 
     for (const name of plugins) {
-      const plugin = this.pluginService.getPlugin(name);
+      const plugin = this.services.plugin.getPlugin(name);
       if (plugin) {
         console.log(chalk.white(`  • ${chalk.cyan(name)}`));
         console.log(
@@ -881,8 +865,6 @@ export default class CLIUI {
   }
 
   private async installPlugin(): Promise<void> {
-    if (!this.pluginService) return;
-
     const pluginSource = await this.getUserInput(
       "\nEnter plugin URL or path (or 'q' to cancel): ",
     );
@@ -910,7 +892,7 @@ export default class CLIUI {
       if (pluginSource.startsWith("http")) {
         // Install from URL (GitHub)
         if (pluginName) {
-          installed = await this.pluginService.installPluginFromGitHubAsync(
+          installed = await this.services.plugin.installPluginFromGitHubAsync(
             pluginSource,
             pluginName,
           );
@@ -921,7 +903,7 @@ export default class CLIUI {
         }
       } else {
         // Install from local path
-        installed = await this.pluginService.installPluginAsync(pluginSource);
+        installed = await this.services.plugin.installPluginAsync(pluginSource);
       }
 
       spinner.stop();
@@ -942,12 +924,10 @@ export default class CLIUI {
   }
 
   private async updateAllPlugins(): Promise<void> {
-    if (!this.pluginService) return;
-
     console.clear();
     this.animationHelper.showHeader("Update Plugins");
 
-    const plugins = this.pluginService.getPluginNames();
+    const plugins = this.services.plugin.getPluginNames();
 
     if (plugins.length === 0) {
       console.log();
@@ -968,9 +948,7 @@ export default class CLIUI {
   }
 
   private async removePlugin(): Promise<void> {
-    if (!this.pluginService) return;
-
-    const plugins = this.pluginService.getPluginNames();
+    const plugins = this.services.plugin.getPluginNames();
 
     if (plugins.length === 0) {
       console.clear();
@@ -1039,7 +1017,7 @@ export default class CLIUI {
 
     try {
       const removed =
-        await this.pluginService.uninstallPluginAsync(pluginNameToRemove);
+        await this.services.plugin.uninstallPluginAsync(pluginNameToRemove);
 
       spinner.stop();
 
