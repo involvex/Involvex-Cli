@@ -7,6 +7,52 @@ The InvolveX plugin system allows you to extend the CLI with custom functionalit
 - Hosted in the official `involvex-plugins` GitHub repository
 - Created locally in the `plugins/` directory
 - Installed remotely from GitHub URLs
+- Managed via CLI commands
+
+## Plugin Management Commands
+
+### List Plugins
+
+```bash
+involvex-cli --plugins list
+```
+
+Shows all installed plugins with version and author.
+
+### Install Plugins
+
+```bash
+# Install from official repository
+involvex-cli --plugins install discord-rpc
+
+# Install from GitHub URL
+involvex-cli --plugins install https://raw.githubusercontent.com/user/repo/main/plugins/my-plugin/index.js
+
+# Install from GitHub (auto-converts URL)
+involvex-cli --plugins install https://github.com/user/repo/blob/main/plugins/my-plugin/index.js
+```
+
+**Installation Flow**:
+
+1. Check local `plugins/` directory
+2. Search official `involvex-plugins` repository
+3. Fall back to GitHub URL if provided
+
+### Update Plugins
+
+```bash
+# Update all plugins
+involvex-cli --plugins update
+
+# Update specific plugin
+involvex-cli --plugins update discord-rpc
+```
+
+### Remove Plugins
+
+```bash
+involvex-cli --plugins remove discord-rpc
+```
 
 ## Plugin Repository Structure
 

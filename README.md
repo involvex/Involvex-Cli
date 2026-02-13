@@ -43,11 +43,23 @@ A comprehensive Windows system administration toolkit built with Node.js and bun
 
 ### User Interface
 
-- Text-based user interface using Blessed.js
-- Interactive menus and dialogs
+- Responsive CLI with chalk + ora animations
+- Smooth menu navigation (number hotkeys, arrow keys)
 - Progress indicators and status updates
-- Keyboard navigation support
-- Built-in Discord Rich Presence integration with random hacker-status messages
+- Real-time visual feedback
+- Plugin extensibility system
+
+### Plugin System
+
+- Install plugins from official repository or custom GitHub repos
+- Create and share custom plugins
+- Plugin CLI management commands:
+  - `involvex-cli --plugins list` - List installed plugins
+  - `involvex-cli --plugins install <name|url>` - Install plugins
+  - `involvex-cli --plugins update [name]` - Update plugins
+  - `involvex-cli --plugins remove <name>` - Remove plugins
+- Built-in plugins for common tasks
+- Full plugin API with access to all services
 
 ## Installation
 
@@ -92,16 +104,86 @@ involvex-cli
 ### Command Line Options
 
 ```bash
-involvex-cli --help       # Show help information
-involvex-cli --version    # Show version information
+involvex-cli --help              # Show help information
+involvex-cli --version           # Show version information
+involvex-cli --plugins list      # List installed plugins
+involvex-cli --plugins install <name|url>  # Install a plugin
+involvex-cli --plugins update [name]       # Update plugins
+involvex-cli --plugins remove <name>       # Remove a plugin
 ```
 
-### Navigation
+### Menu Navigation
 
-- Use arrow keys to navigate menus
-- Press Enter to select options
-- Press F10 or Escape to quit
-- Press F9 for help
+- **Number keys** (1-5): Direct menu item selection
+- **Arrow keys** (↑/↓): Navigate menu items
+- **Space/Enter**: Select highlighted item
+- **Q key**: Quit instantly
+- **Ctrl+C**: Emergency exit
+
+### Plugin Management
+
+#### List Installed Plugins
+
+```bash
+involvex-cli --plugins list
+```
+
+#### Install Plugins
+
+From official repository:
+
+```bash
+involvex-cli --plugins install discord-rpc
+involvex-cli --plugins install system-monitor
+```
+
+From custom GitHub repository:
+
+```bash
+involvex-cli --plugins install https://raw.githubusercontent.com/user/repo/main/plugins/my-plugin/index.js
+```
+
+#### Update Plugins
+
+```bash
+# Update all plugins
+involvex-cli --plugins update
+
+# Update specific plugin
+involvex-cli --plugins update discord-rpc
+```
+
+#### Remove Plugins
+
+```bash
+involvex-cli --plugins remove discord-rpc
+```
+
+## Plugins
+
+The CLI includes extensible plugin system. See [`plugins/README.md`](plugins/README.md) for:
+
+- **Available plugins** - Built-in and official plugins
+- **Plugin installation** - How to install and manage plugins
+- **Create custom plugins** - Full plugin development guide
+- **Plugin repository** - Official GitHub repository
+
+### Popular Plugins
+
+- **discord-rpc** - Display CLI status in Discord
+- **system-monitor** - Real-time system monitoring
+- **process-manager** - Advanced process management
+- **service-manager** - Windows service utilities
+- **network-tools** - Network diagnostics and tools
+
+For full plugin documentation, see [`PLUGIN_DEVELOPMENT.md`](PLUGIN_DEVELOPMENT.md)
+
+## Navigation
+
+- Use number keys (1-5) for quick menu selection
+- Use arrow keys (↑/↓) to navigate menu items
+- Press Space or Enter to select highlighted item
+- Press Q to quit or Ctrl+C to force exit
 
 ## Discord Rich Presence Plugin
 

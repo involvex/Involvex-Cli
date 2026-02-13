@@ -11,6 +11,7 @@ const VERSION = packageJson.version;
 import StorageManagerService from "./services/StorageManagerService";
 import PackageManagerService from "./services/PackageManagerService";
 import SystemRestoreService from "./services/SystemRestoreService";
+import PluginCommandHandler from "./services/PluginCommandHandler";
 import UninstallerService from "./services/UninstallerService";
 import UIAnimationHelper from "./services/UIAnimationHelper";
 import AutoUpdateService from "./services/AutoUpdateService";
@@ -73,7 +74,12 @@ async function main() {
     console.log(
       "  --web, --webserver       Start web server mode (default: CLI UI)",
     );
-    console.log("  --install-plugin <url>   Install plugin from GitHub URL");
+    console.log(
+      "  --plugins <cmd> [args]   Plugin management (list/install/update/remove)",
+    );
+    console.log(
+      "  --install-plugin <url>   Install plugin from GitHub URL (legacy)",
+    );
     process.exit(0);
   }
 
@@ -82,7 +88,24 @@ async function main() {
     process.exit(0);
   }
 
-  // Handle plugin installation
+  // Handle plugin commands (new system)
+  const pluginsIdx = args.indexOf("--plugins");
+  if (pluginsIdx !== -1) {
+    const logService = new LogService();
+    const configService = new ConfigService(logService);
+    const pluginService = new PluginService(logService, configService);
+    const pluginCommandHandler = new PluginCommandHandler(
+      logService,
+      pluginService,
+      configService,
+    );
+
+    const pluginArgs = args.slice(pluginsIdx + 1);
+    await pluginCommandHandler.handleCommand("plugins", pluginArgs);
+    process.exit(0);
+  }
+
+  // Handle plugin installation (legacy)
   const installIdx = args.indexOf("--install-plugin");
   if (installIdx !== -1 && installIdx + 1 < args.length) {
     const pluginUrl = args[installIdx + 1];

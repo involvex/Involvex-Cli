@@ -350,6 +350,7 @@ export default class CLIUI {
       if (key === "\u0003" || key.toLowerCase() === "q") {
         isRunning = false;
         process.stdin.setRawMode(false);
+        process.stdin.removeListener("data", handleKeypress);
         await this.exit();
         return;
       }
@@ -385,12 +386,22 @@ export default class CLIUI {
       }
     };
 
+    // Display menu once initially
+    this.displayMenu();
+
+    // Wait for key input - menu only redraws on key press (no flickering!)
     process.stdin.on("data", handleKeypress);
 
-    while (isRunning) {
-      this.displayMenu();
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
+    // Keep the process alive until exit
+    await new Promise<void>(resolve => {
+      // Reuse the isRunning flag check via a dummy promise that resolves on exit
+      const checkExit = setInterval(() => {
+        if (!isRunning) {
+          clearInterval(checkExit);
+          resolve();
+        }
+      }, 100);
+    });
 
     process.stdin.removeListener("data", handleKeypress);
   }
