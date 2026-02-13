@@ -9,6 +9,19 @@ export interface ILogService {
 }
 
 /**
+ * Menu Stack service interface
+ */
+export interface IMenuStackService {
+  push(menu: string): void;
+  pop(): string | undefined;
+  current(): string;
+  depth(): number;
+  isMain(): boolean;
+  clear(): void;
+  history(): string[];
+}
+
+/**
  * Result from executing a process command
  */
 export interface ProcessResult {

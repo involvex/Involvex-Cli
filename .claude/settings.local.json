@@ -1,5 +1,12 @@
 {
   "permissions": {
-    "allow": ["Bash(bun i:*)", "Bash(dos2unix:*)", "Bash(xxd:*)"]
+    "allow": [
+      "Bash(bun i:*)",
+      "Bash(dos2unix:*)",
+      "Bash(xxd:*)",
+      "Bash(for file in *.js)",
+      "Bash(do:*)",
+      "Bash(done)"
+    ]
   }
 }

@@ -32,7 +32,7 @@ A comprehensive Windows system administration toolkit built with Node.js and bun
 ### Network Tools
 
 - Ping tests with customizable hosts
-- Internet speed tests
+- **Internet speed testing** (via speedtest-cli integration)
 - DNS configuration management
 
 ### System Administration
@@ -48,6 +48,7 @@ A comprehensive Windows system administration toolkit built with Node.js and bun
 - Progress indicators and status updates
 - Real-time visual feedback
 - Plugin extensibility system
+- **Persistent user configuration** (settings, preferences, paths)
 
 ### Plugin System
 
@@ -159,6 +160,43 @@ involvex-cli --plugins update discord-rpc
 involvex-cli --plugins remove discord-rpc
 ```
 
+## Configuration
+
+InvolveX CLI stores user preferences and configuration in a persistent configuration file located at `~/.involvex-cli/config.json` (on Windows: `C:\Users\{USER}\AppData\Roaming\involvex-cli\config.json`).
+
+### Configuration Options
+
+Access configuration through the **Settings** menu in the CLI:
+
+- **Auto-update**: Enable/disable automatic package updates (default: `true`)
+- **Theme**: Choose between `dark` or `light` theme (default: `dark`)
+- **Log Level**: Set verbosity level (`debug`, `info`, `warn`, `error`, default: `info`)
+- **Config Path**: Custom configuration directory (default: `~/.involvex-cli`)
+
+### Configuration File Format
+
+```json
+{
+  "autoUpdate": true,
+  "theme": "dark",
+  "logLevel": "info",
+  "configPath": "~/.involvex-cli"
+}
+```
+
+### Programmatic Configuration Access
+
+The `ConfigurationManager` service handles all configuration I/O:
+
+```typescript
+const configManager = new ConfigurationManager(logService);
+await configManager.initializeAsync();
+
+const config = configManager.getConfig();
+configManager.setAutoUpdate(false);
+await configManager.saveConfigAsync();
+```
+
 ## Plugins
 
 The CLI includes extensible plugin system. See [`plugins/README.md`](plugins/README.md) for:
@@ -175,8 +213,39 @@ The CLI includes extensible plugin system. See [`plugins/README.md`](plugins/REA
 - **process-manager** - Advanced process management
 - **service-manager** - Windows service utilities
 - **network-tools** - Network diagnostics and tools
+- **speed-test** - Internet speed testing with detailed metrics
 
 For full plugin documentation, see [`PLUGIN_DEVELOPMENT.md`](PLUGIN_DEVELOPMENT.md)
+
+## Speed Test Plugin
+
+The speed-test plugin provides internet speed testing capabilities directly from the CLI:
+
+- **Download/Upload speeds** - Measured in Mbps with optional MBps conversion
+- **Ping latency** - Network responsiveness measurement
+- **Formatted results** - Color-coded output with styled tables
+- **JSON export** - Machine-readable output for scripting
+
+### Requirements
+
+- `speedtest-cli` or `speedtest` command-line tool must be installed
+- Active internet connection for testing
+
+### Usage
+
+Access from the main menu or invoke directly in future versions with:
+
+```bash
+involvex-cli --speed-test
+```
+
+### Results Display
+
+Results are displayed with:
+
+- Color-coded performance indicators (green/yellow/red based on speed)
+- Server information and test timestamp
+- Dual format output (Mbps and MBps)
 
 ## Navigation
 

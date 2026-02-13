@@ -6,7 +6,6 @@ const config: Config = {
   collectCoverageFrom: ["src/**/*.ts", "!src/**/*.d.ts", "!src/**/*.test.ts"],
   coverageDirectory: "coverage",
   coverageReporters: ["text", "lcov", "html"],
-  setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   testTimeout: 10000,
   maxWorkers: 1, // Reduce to single worker to avoid hanging
   forceExit: true, // Force exit after tests complete

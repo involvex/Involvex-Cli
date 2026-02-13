@@ -12,6 +12,7 @@ import StorageManagerService from "./services/StorageManagerService";
 import PackageManagerService from "./services/PackageManagerService";
 import SystemRestoreService from "./services/SystemRestoreService";
 import PluginCommandHandler from "./services/PluginCommandHandler";
+import ConfigurationManager from "./services/ConfigurationManager";
 import UninstallerService from "./services/UninstallerService";
 import UIAnimationHelper from "./services/UIAnimationHelper";
 import AutoUpdateService from "./services/AutoUpdateService";
@@ -154,6 +155,12 @@ async function main() {
     uiAnimationHelper.showSection("Loading settings...");
     await settingsService.loadSettingsAsync();
     uiAnimationHelper.showSuccess("Settings loaded");
+
+    // Initialize user configuration
+    const configurationManager = new ConfigurationManager(logService);
+    uiAnimationHelper.showSection("Initializing user configuration...");
+    await configurationManager.initializeAsync();
+    uiAnimationHelper.showSuccess("User configuration initialized");
 
     // Initialize plugin service
     uiAnimationHelper.showSection("Initializing plugins...");

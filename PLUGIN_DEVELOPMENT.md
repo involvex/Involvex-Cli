@@ -228,9 +228,40 @@ class MyPlugin {
     this.storage = services.storage;
     this.uninstaller = services.uninstaller;
     this.settings = services.settings;
+    this.configurationManager = services.configuration; // User config
   }
 }
 ```
+
+### ConfigurationManager Service
+
+Access and modify user configuration:
+
+```javascript
+// Get entire configuration
+const config = this.services.configuration.getConfig();
+console.log(config.autoUpdate); // true
+console.log(config.theme); // "dark"
+
+// Modify specific settings
+this.services.configuration.setAutoUpdate(false);
+this.services.configuration.setTheme("light");
+this.services.configuration.setLogLevel("debug");
+this.services.configuration.setConfigPath("C:\\custom\\path");
+
+// Persist changes
+await this.services.configuration.saveConfigAsync();
+
+// Reload from disk
+await this.services.configuration.initializeAsync();
+```
+
+Available configuration keys:
+
+- `autoUpdate` (boolean) - Auto-update packages
+- `theme` (string: "dark" | "light") - UI theme
+- `logLevel` (string: "debug" | "info" | "warn" | "error") - Log verbosity
+- `configPath` (string) - Configuration directory path
 
 ## Plugin Development Tips
 
