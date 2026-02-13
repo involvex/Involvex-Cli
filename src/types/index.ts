@@ -101,6 +101,55 @@ export interface ICacheService {
 }
 
 /**
+ * UI Animation Helper interface
+ */
+export interface IUIAnimationHelper {
+  showHeader(text: string): void;
+  showSection(text: string): void;
+  showSuccess(text: string): void;
+  showError(text: string): void;
+  showWarning(text: string): void;
+  showInfo(text: string): void;
+  createSpinner(text: string): ReturnType<typeof import("ora").default>;
+  showSeparator(): void;
+  showTable(title: string, rows: string[][]): void;
+}
+
+/**
+ * Clear Cache service interface
+ */
+export interface IClearCacheService {
+  clearAllCaches(): Promise<
+    Array<{ name: string; success: boolean; error?: string; size?: string }>
+  >;
+  clearSelectiveCaches(
+    caches: string[],
+  ): Promise<
+    Array<{ name: string; success: boolean; error?: string; size?: string }>
+  >;
+  clearMemory(): Promise<boolean>;
+  clearStandbyMemory(): Promise<boolean>;
+  getCacheSizes(): Promise<
+    Array<{ name: string; success: boolean; error?: string; size?: string }>
+  >;
+}
+
+/**
+ * Logo Service Interface
+ */
+export interface ILogoService {
+  showStartupLogo(): void;
+  showMenuLogo(): void;
+  showCacheLogo(): void;
+  clearScreen(): void;
+  showAnimatedLogo(frames: string[]): void;
+  getSpinnerFrames(): string[];
+  getCacheAnimationFrames(): string[];
+  getMemoryAnimationFrames(): string[];
+  showTransition(): void;
+}
+
+/**
  * Plugin service interface
  */
 export interface IPluginService {

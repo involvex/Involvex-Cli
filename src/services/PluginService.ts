@@ -313,6 +313,59 @@ export default class PluginService {
     }
   }
 
+  async installPluginFromGitHubAsync(
+    repoUrl: string,
+    pluginName: string,
+  ): Promise<boolean> {
+    try {
+      // Parse GitHub URL and construct raw content URL
+      let rawUrl = repoUrl;
+
+      // Convert github.com URLs to raw.githubusercontent.com
+      if (repoUrl.includes("github.com")) {
+        rawUrl = repoUrl
+          .replace("github.com", "raw.githubusercontent.com")
+          .replace("/blob/", "/");
+      }
+
+      // Ensure URL points to a .js file
+      if (!rawUrl.endsWith(".js")) {
+        rawUrl = `${rawUrl}/index.js`;
+      }
+
+      this.logService.log(`Fetching plugin from GitHub: ${rawUrl}`);
+
+      // Fetch the plugin code
+      const response = await fetch(rawUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch plugin: ${response.statusText}`);
+      }
+
+      const pluginCode = await response.text();
+
+      // Create a temporary file and install
+      const tempPath = path.join(os.tmpdir(), `${pluginName}-${Date.now()}.js`);
+      await fs.writeFile(tempPath, pluginCode);
+
+      // Install from temp location
+      const installed = await this.installPluginAsync(tempPath);
+
+      // Cleanup temp file
+      try {
+        await fs.unlink(tempPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+
+      return installed;
+    } catch (error: unknown) {
+      this.logService.log(
+        `Error installing plugin from GitHub: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
+  }
+
   async uninstallPluginAsync(pluginName: string): Promise<boolean> {
     try {
       // Get metadata before unloading (since unloadPluginAsync deletes it)

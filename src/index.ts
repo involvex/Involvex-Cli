@@ -12,6 +12,7 @@ import StorageManagerService from "./services/StorageManagerService";
 import PackageManagerService from "./services/PackageManagerService";
 import SystemRestoreService from "./services/SystemRestoreService";
 import UninstallerService from "./services/UninstallerService";
+import UIAnimationHelper from "./services/UIAnimationHelper";
 import AutoUpdateService from "./services/AutoUpdateService";
 import SettingsService from "./services/SettingsService";
 import StartupService from "./services/StartupService";
@@ -19,6 +20,7 @@ import NetworkService from "./services/NetworkService";
 import PluginService from "./services/PluginService";
 import ConfigService from "./services/ConfigService";
 import CacheService from "./services/CacheService";
+import LogoService from "./services/LogoService";
 import LogService from "./services/LogService";
 import DnsService from "./services/DnsService";
 import WebServer from "./server/webServer";
@@ -31,6 +33,8 @@ const settingsService = new SettingsService(logService);
 const packageManagerService = new PackageManagerService(logService);
 const networkService = new NetworkService(logService);
 const cacheService = new CacheService(logService);
+const uiAnimationHelper = new UIAnimationHelper(logService);
+const logoService = new LogoService(logService);
 const startupService = new StartupService(logService);
 const uninstallerService = new UninstallerService(logService);
 const dnsService = new DnsService(logService);
@@ -64,9 +68,12 @@ async function main() {
     console.log(`InvolveX CLI v${VERSION}`);
     console.log("Usage: involvex-cli [options]");
     console.log("Options:");
-    console.log("  --help, -h        Show this help message");
-    console.log("  --version, -v     Show version");
-    console.log("  --web, --webserver Start web server mode (default: CLI UI)");
+    console.log("  --help, -h               Show this help message");
+    console.log("  --version, -v            Show version");
+    console.log(
+      "  --web, --webserver       Start web server mode (default: CLI UI)",
+    );
+    console.log("  --install-plugin <url>   Install plugin from GitHub URL");
     process.exit(0);
   }
 
@@ -75,23 +82,67 @@ async function main() {
     process.exit(0);
   }
 
-  try {
-    console.log(`InvolveX CLI v${VERSION} starting...`);
+  // Handle plugin installation
+  const installIdx = args.indexOf("--install-plugin");
+  if (installIdx !== -1 && installIdx + 1 < args.length) {
+    const pluginUrl = args[installIdx + 1];
+    if (!pluginUrl) {
+      console.error("✗ Plugin URL is required");
+      process.exit(1);
+    }
 
-    // Load configuration and settings
-    console.log("Loading configuration...");
+    const logService = new LogService();
+    const configService = new ConfigService(logService);
+    const pluginService = new PluginService(logService, configService);
+
+    console.log(`Installing plugin from: ${pluginUrl}`);
+    const pluginName =
+      pluginUrl.split("/").pop()?.replace(".js", "") || "plugin";
+
+    try {
+      const success = await pluginService.installPluginFromGitHubAsync(
+        pluginUrl,
+        pluginName,
+      );
+      if (success) {
+        console.log(`✓ Plugin '${pluginName}' installed successfully!`);
+        process.exit(0);
+      } else {
+        console.error(`✗ Failed to install plugin from ${pluginUrl}`);
+        process.exit(1);
+      }
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(`✗ Error installing plugin: ${errorMsg}`);
+      process.exit(1);
+    }
+  }
+
+  try {
+    // Show startup logo only once at the very beginning
+    logoService.showStartupLogo();
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    uiAnimationHelper.showHeader(`InvolveX CLI v${VERSION}`);
+    uiAnimationHelper.showSection("Loading configuration...");
     await configService.loadConfigAsync();
+    uiAnimationHelper.showSuccess("Configuration loaded");
+
+    uiAnimationHelper.showSection("Loading settings...");
     await settingsService.loadSettingsAsync();
+    uiAnimationHelper.showSuccess("Settings loaded");
 
     // Initialize plugin service
-    console.log("Initializing plugins...");
+    uiAnimationHelper.showSection("Initializing plugins...");
     await pluginService.initializeAsync();
+    uiAnimationHelper.showSuccess("Plugins initialized");
 
     // Create system restore point before making changes (skip in dev mode)
     if (process.env.NODE_ENV !== "development") {
-      console.log("Creating system restore point...");
+      uiAnimationHelper.showSection("Creating system restore point...");
       const restorePointDescription = `Before InvolveX CLI v${VERSION} operations`;
       await systemRestoreService.createRestorePoint(restorePointDescription);
+      uiAnimationHelper.showSuccess("System restore point created");
     }
 
     // Determine whether to start web server or CLI UI
@@ -99,8 +150,11 @@ async function main() {
 
     if (useWebServer) {
       // Start the web server
-      console.log("Starting web server on http://0.0.0.0:3000...");
+      uiAnimationHelper.showSection(
+        "Starting web server on http://0.0.0.0:3000...",
+      );
       await webServer.start(3000, "0.0.0.0");
+      uiAnimationHelper.showSuccess("Web server started");
 
       // Run auto-update check (don't await, let it run in background)
       autoUpdateService.performAutoUpdate().catch((error: unknown) => {
@@ -109,17 +163,18 @@ async function main() {
         console.error(`Auto-update check failed: ${errorMessage}`);
       });
 
-      console.log("InvolveX CLI is ready. Press Ctrl+C to exit.");
+      uiAnimationHelper.showInfo(
+        "InvolveX CLI is ready. Press Ctrl+C to exit.",
+      );
 
       // Handle graceful shutdown
       process.on("SIGINT", async () => {
-        console.log("\nShutting down...");
+        uiAnimationHelper.showWarning("Shutting down...");
         await webServer.stop();
         process.exit(0);
       });
     } else {
       // Start CLI UI by default
-      console.clear();
       const cli = new CLIUI(
         {
           log: logService,
@@ -139,7 +194,7 @@ async function main() {
         logService.log(`Auto-update check failed: ${errorMessage}`);
       });
 
-      cli.start();
+      await cli.start();
 
       // Handle exit
       process.on("SIGINT", async () => {
